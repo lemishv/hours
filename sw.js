@@ -1,4 +1,4 @@
-const CACHE = 'hours-v4';
+const CACHE = 'hours-v5';
 const ASSETS = [
   './',
   'index.html',
