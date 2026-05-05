@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0a0a0a">
+<meta name="theme-color" content="#0a0a0a" id="metaThemeColor">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Облік часу</title>
+<link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -23,8 +24,32 @@
     --accent: #d4a574;
     --accent-dim: #8a6a4a;
     --danger: #c45a5a;
+    /* Темно-залежні відтінки, винесені в змінні задля світлої теми */
+    --footer-value: #e8c090;
+    --modal-overlay-bg: rgba(0,0,0,0.6);
+    --seg-shadow: rgba(0,0,0,0.3);
+    --accent-tint: rgba(212,165,116,0.08);
+    --accent-tint-faint: rgba(212,165,116,0.06);
     --serif: 'Fraunces', Georgia, serif;
     --mono: 'JetBrains Mono', 'Courier New', monospace;
+  }
+
+  [data-theme="light"] {
+    --bg: #f7f3eb;
+    --bg-elev: #efe9dc;
+    --bg-elev-2: #e6deca;
+    --border: #d4c9ad;
+    --text: #1a1715;
+    --text-dim: #6e6557;
+    --text-faint: #a89e8a;
+    --accent: #b8864a;
+    --accent-dim: #8a6432;
+    --danger: #a93e3e;
+    --footer-value: #946530;
+    --modal-overlay-bg: rgba(40,30,15,0.4);
+    --seg-shadow: rgba(0,0,0,0.08);
+    --accent-tint: rgba(184,134,74,0.10);
+    --accent-tint-faint: rgba(184,134,74,0.07);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -139,7 +164,7 @@
     min-height: 64px;
   }
   .day-row:active { background: var(--bg-elev); }
-  .day-row.today { background: linear-gradient(90deg, rgba(212,165,116,0.06), transparent 60%); }
+  .day-row.today { background: linear-gradient(90deg, var(--accent-tint-faint), transparent 60%); }
   .day-row.today .day-name { color: var(--accent); }
 
   .day-name {
@@ -194,7 +219,7 @@
     font-family: var(--serif);
     font-size: 40px;
     font-weight: 500;
-    color: #e8c090;
+    color: var(--footer-value);
     font-variant-numeric: tabular-nums;
     line-height: 1;
     letter-spacing: -0.5px;
@@ -204,7 +229,7 @@
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.6);
+    background: var(--modal-overlay-bg);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     display: flex;
@@ -276,7 +301,7 @@
   .seg button.active {
     background: var(--bg);
     color: var(--accent);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px var(--seg-shadow);
   }
 
   /* FIELDS */
@@ -318,7 +343,7 @@
     color: var(--text-dim);
     background: var(--bg-elev-2);
   }
-  .break-chip.active { color: var(--accent); border-color: var(--accent); background: rgba(212,165,116,0.08); }
+  .break-chip.active { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
 
   /* DURATION PREVIEW */
   .duration-preview {
@@ -640,20 +665,20 @@
 <body>
 
 <header>
-  <button class="nav-btn" id="prevWeek" aria-label="Попередній тиждень">‹</button>
+  <button class="nav-btn" id="prevWeek">‹</button>
   <button class="week-title" id="weekTitle">
     <div class="week-range" id="weekRange">—</div>
     <div class="week-num" id="weekNum"></div>
-    <input type="date" id="datePicker" class="date-overlay" aria-label="Вибрати дату">
+    <input type="date" id="datePicker" class="date-overlay">
   </button>
-  <button class="nav-btn" id="nextWeek" aria-label="Наступний тиждень">›</button>
-  <button class="nav-btn" id="settingsBtn" aria-label="Налаштування">⚙</button>
+  <button class="nav-btn" id="nextWeek">›</button>
+  <button class="nav-btn" id="settingsBtn">⚙</button>
 </header>
 
 <main id="daysContainer"></main>
 
 <footer>
-  <div class="footer-label">За тиждень</div>
+  <div class="footer-label" id="footerLabel">За тиждень</div>
   <div class="footer-value" id="weekTotal">0.0</div>
 </footer>
 
@@ -665,14 +690,184 @@
 
 // ============ CONSTANTS ============
 const STORAGE_KEY = 'workhours.v1';
-const DAY_NAMES_SHORT = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
-const DAY_NAMES_LONG = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
-const MONTH_GENITIVE = ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
-const MONTH_SHORT = ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
+
+// Мовозалежні масиви — індексуються через [state.lang]
+const DAY_NAMES_SHORT = {
+  uk: ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'],
+  en: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+};
+const DAY_NAMES_LONG = {
+  uk: ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'],
+  en: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+};
+const MONTH_GENITIVE = {
+  uk: ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'],
+  en: ['January','February','March','April','May','June','July','August','September','October','November','December']
+};
+const MONTH_SHORT = {
+  uk: ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'],
+  en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+};
+
+// ============ I18N ============
+const I18N = {
+  uk: {
+    appTitle: 'Облік часу',
+    // header
+    prevWeek: 'Попередній тиждень',
+    nextWeek: 'Наступний тиждень',
+    selectDate: 'Вибрати дату',
+    settings: 'Налаштування',
+    weekN: 'тиждень',
+    // day list
+    addTime: '+ додати час',
+    dayOffShort: 'вихідний',
+    // footer
+    weekTotalLabel: 'За тиждень',
+    // editor
+    workDay: 'Робочий день',
+    dayOffSeg: 'Вихідний',
+    start: 'Старт',
+    finish: 'Фініш',
+    hadBreak: 'Була перерва',
+    breakOther: 'інше',
+    durationLabel: 'Тривалість',
+    cancel: 'Скасувати',
+    save: 'Зберегти',
+    clearEntry: 'Очистити запис',
+    finishMustBeLater: 'фініш має бути пізніше',
+    breakTooLong: 'перерва задовга',
+    clearEntryConfirm: 'Очистити запис за цей день?',
+    // settings
+    report: 'Звіт',
+    statistics: 'Статистика',
+    totalHours: 'Усього годин',
+    workDays: 'Робочих днів',
+    avgPerDay: 'В середньому за день',
+    weeksCount: 'Тижнів',
+    avgPerWeek: 'В середньому за тиждень',
+    noRecords: 'Поки що немає записів',
+    sendReport: 'Надіслати звіт',
+    currentWeek: 'Поточний тиждень',
+    fullReport: 'Повний звіт',
+    allWeeks: 'усі тижні',
+    worker: 'Працівник',
+    enterName: 'Введіть імʼя',
+    appearance: 'Вигляд',
+    dark: 'Темна',
+    light: 'Світла',
+    language: 'Мова',
+    data: 'Дані',
+    deleteAll: 'Видалити всі записи',
+    deleteAllConfirm: 'Видалити всі записи назавжди? Ця дія незворотна.',
+    done: 'Готово',
+    hours: 'год',
+    // PDF
+    pdfTitle: 'Години',
+    pdfDay: 'День',
+    pdfDate: 'Дата',
+    pdfStart: 'Старт',
+    pdfFinish: 'Фініш',
+    pdfBreak: 'Перерва',
+    pdfDuration: 'Тривалість',
+    pdfWeekSummary: 'Підсумок тижня',
+    pdfRunningTotal: 'Накопичено від початку',
+    pdfWeek: 'Тиждень',
+    pdfTotalForPeriod: 'Усього за період',
+    pdfWorkDaysLabel: 'робочих днів',
+    pdfDayOff: 'вихідний',
+    pdfNoData: 'Немає даних для експорту.',
+    pdfShareTitle: 'Облік робочого часу',
+    pdfShareReport: 'Звіт',
+    pdfErrorMessage: 'Не вдалося згенерувати PDF. Перевір підключення до інтернету (для першого експорту потрібен інтернет).',
+    pdfNoName: '(імʼя не вказано)'
+  },
+  en: {
+    appTitle: 'Hours',
+    prevWeek: 'Previous week',
+    nextWeek: 'Next week',
+    selectDate: 'Pick a date',
+    settings: 'Settings',
+    weekN: 'week',
+    addTime: '+ add time',
+    dayOffShort: 'day off',
+    weekTotalLabel: 'This week',
+    workDay: 'Work day',
+    dayOffSeg: 'Day off',
+    start: 'Start',
+    finish: 'Finish',
+    hadBreak: 'Had a break',
+    breakOther: 'other',
+    durationLabel: 'Duration',
+    cancel: 'Cancel',
+    save: 'Save',
+    clearEntry: 'Clear entry',
+    finishMustBeLater: 'finish must be later',
+    breakTooLong: 'break too long',
+    clearEntryConfirm: 'Clear the entry for this day?',
+    report: 'Report',
+    statistics: 'Statistics',
+    totalHours: 'Total hours',
+    workDays: 'Work days',
+    avgPerDay: 'Average per day',
+    weeksCount: 'Weeks',
+    avgPerWeek: 'Average per week',
+    noRecords: 'No entries yet',
+    sendReport: 'Send report',
+    currentWeek: 'Current week',
+    fullReport: 'Full report',
+    allWeeks: 'all weeks',
+    worker: 'Worker',
+    enterName: 'Enter name',
+    appearance: 'Appearance',
+    dark: 'Dark',
+    light: 'Light',
+    language: 'Language',
+    data: 'Data',
+    deleteAll: 'Delete all entries',
+    deleteAllConfirm: 'Delete all entries permanently? This action cannot be undone.',
+    done: 'Done',
+    hours: 'h',
+    pdfTitle: 'Hours',
+    pdfDay: 'Day',
+    pdfDate: 'Date',
+    pdfStart: 'Start',
+    pdfFinish: 'Finish',
+    pdfBreak: 'Break',
+    pdfDuration: 'Duration',
+    pdfWeekSummary: 'Week total',
+    pdfRunningTotal: 'Running total',
+    pdfWeek: 'Week',
+    pdfTotalForPeriod: 'Total for period',
+    pdfWorkDaysLabel: 'work days',
+    pdfDayOff: 'day off',
+    pdfNoData: 'No data to export.',
+    pdfShareTitle: 'Work time report',
+    pdfShareReport: 'Report',
+    pdfErrorMessage: 'Could not generate PDF. Check your internet connection (the first export requires internet).',
+    pdfNoName: '(name not set)'
+  }
+};
+
+// Шорткат для перекладу — читає поточну мову з state
+function t(key) {
+  return I18N[state.lang][key] || I18N.uk[key] || key;
+}
+
+// Локалізована множина для тижнів — українська має 3 форми, англійська 2
+function pluralWeeks(n) {
+  if (state.lang === 'en') return n === 1 ? 'week' : 'weeks';
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'тиждень';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'тижні';
+  return 'тижнів';
+}
 
 // ============ STATE ============
 let state = {
   workerName: '',
+  theme: 'dark', // 'dark' | 'light'
+  lang: 'uk',    // 'uk' | 'en'
   days: {} // { 'YYYY-MM-DD': { start: '08:00', end: '17:00', breakMin: 0, dayOff: false } }
 };
 let currentMonday = mondayOf(new Date());
@@ -687,6 +882,7 @@ function load() {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
         state.workerName = parsed.workerName || '';
+        state.theme = (parsed.theme === 'light' || parsed.theme === 'dark') ? parsed.theme : 'dark';
         state.days = parsed.days || {};
       }
     }
@@ -745,8 +941,8 @@ function weekDates(monday) {
 
 function formatWeekRange(monday) {
   const sunday = addDays(monday, 6);
-  const m1 = MONTH_SHORT[monday.getMonth()];
-  const m2 = MONTH_SHORT[sunday.getMonth()];
+  const m1 = MONTH_SHORT[state.lang][monday.getMonth()];
+  const m2 = MONTH_SHORT[state.lang][sunday.getMonth()];
   const y1 = monday.getFullYear();
   const y2 = sunday.getFullYear();
   if (m1 === m2 && y1 === y2) {
@@ -759,8 +955,8 @@ function formatWeekRange(monday) {
 }
 
 function formatLongDay(date) {
-  const dn = DAY_NAMES_LONG[date.getDay()];
-  return `${dn}, ${date.getDate()} ${MONTH_GENITIVE[date.getMonth()]}`;
+  const dn = DAY_NAMES_LONG[state.lang][date.getDay()];
+  return `${dn}, ${date.getDate()} ${MONTH_GENITIVE[state.lang][date.getMonth()]}`;
 }
 
 // ============ TIME / DURATION ============
@@ -844,7 +1040,7 @@ function computeWeekLabel() {
   const diffDays = Math.round((currentMonday - firstMonday) / 86400000);
   const weekIdx = Math.floor(diffDays / 7) + 1;
   if (weekIdx < 1) return '';
-  return `тиждень ${weekIdx}`;
+  return `${t('weekN')} ${weekIdx}`;
 }
 
 function renderDays() {
@@ -860,7 +1056,7 @@ function renderDays() {
 
     const dayName = document.createElement('div');
     dayName.className = 'day-name';
-    dayName.textContent = DAY_NAMES_SHORT[date.getDay()];
+    dayName.textContent = DAY_NAMES_SHORT[state.lang][date.getDay()];
 
     const dayNum = document.createElement('div');
     dayNum.className = 'day-num';
@@ -874,20 +1070,20 @@ function renderDays() {
 
     if (!day) {
       info.classList.add('empty');
-      info.textContent = '+ додати час';
+      info.textContent = t('addTime');
     } else if (day.dayOff) {
       info.classList.add('dayoff');
-      info.textContent = 'вихідний';
+      info.textContent = t('dayOffShort');
     } else if (day.start && day.end) {
       info.textContent = `${day.start} → ${day.end}`;
       if (day.breakMin) {
-        info.textContent += ` · ${day.breakMin}хв`;
+        info.textContent += ` · ${day.breakMin}${state.lang === 'en' ? 'min' : 'хв'}`;
       }
       const h = calcDurationHours(day);
       hours.textContent = fmtHours(h);
     } else {
       info.classList.add('empty');
-      info.textContent = '+ додати час';
+      info.textContent = t('addTime');
     }
 
     row.appendChild(dayName);
@@ -934,48 +1130,48 @@ function renderDayEditor() {
         </div>
 
         <div class="seg">
-          <button id="segWork" class="${isWork ? 'active' : ''}">Робочий день</button>
-          <button id="segOff" class="${!isWork ? 'active' : ''}">Вихідний</button>
+          <button id="segWork" class="${isWork ? 'active' : ''}">${t('workDay')}</button>
+          <button id="segOff" class="${!isWork ? 'active' : ''}">${t('dayOffSeg')}</button>
         </div>
 
         <div id="workFields" class="${isWork ? '' : 'hidden'}">
           <div class="field-row">
             <div class="field">
-              <label class="field-label">Старт</label>
+              <label class="field-label">${t('start')}</label>
               <input type="time" id="inputStart" value="${draft.start || ''}">
             </div>
             <div class="field">
-              <label class="field-label">Фініш</label>
+              <label class="field-label">${t('finish')}</label>
               <input type="time" id="inputEnd" value="${draft.end || ''}">
             </div>
           </div>
 
           <label class="break-toggle">
             <input type="checkbox" id="breakCheck" ${hasBreak ? 'checked' : ''}>
-            <span>Була перерва</span>
+            <span>${t('hadBreak')}</span>
           </label>
           <div class="break-options ${hasBreak ? 'visible' : ''}" id="breakOptions">
             ${[15, 30, 45, 60].map(m => `
-              <button class="break-chip ${draft.breakMin === m ? 'active' : ''}" data-min="${m}">${m} хв</button>
+              <button class="break-chip ${draft.breakMin === m ? 'active' : ''}" data-min="${m}">${m} ${state.lang === 'en' ? 'min' : 'хв'}</button>
             `).join('')}
-            <input type="number" id="breakCustom" min="1" max="480" placeholder="інше"
+            <input type="number" id="breakCustom" min="1" max="480" placeholder="${t('breakOther')}"
               value="${hasBreak && ![15,30,45,60].includes(draft.breakMin) ? draft.breakMin : ''}"
               style="width: 90px; padding: 8px 12px; font-size: 14px;">
           </div>
 
           <div class="duration-preview">
-            <div class="label">Тривалість</div>
+            <div class="label">${t('durationLabel')}</div>
             <div class="value" id="durationPreview">—</div>
           </div>
         </div>
 
         <div class="btn-row">
-          <button class="btn btn-ghost" id="cancelBtn">Скасувати</button>
-          <button class="btn btn-primary" id="saveBtn">Зберегти</button>
+          <button class="btn btn-ghost" id="cancelBtn">${t('cancel')}</button>
+          <button class="btn btn-primary" id="saveBtn">${t('save')}</button>
         </div>
 
         ${state.days[editingDate] ? `
-          <button class="btn btn-danger" id="deleteBtn">Очистити запис</button>
+          <button class="btn btn-danger" id="deleteBtn">${t('clearEntry')}</button>
         ` : ''}
       </div>
     </div>
@@ -1044,7 +1240,7 @@ function updateDurationPreview() {
   const h = calcDurationHours(editDraft);
   if (h != null) {
     el.classList.remove('invalid');
-    el.textContent = fmtHours(h) + ' год';
+    el.textContent = fmtHours(h) + ' ' + t('hours');
     return;
   }
   // h == null — щось не так. Показуємо чому.
@@ -1061,12 +1257,12 @@ function updateDurationPreview() {
     return;
   }
   if (e <= s) {
-    el.textContent = 'фініш має бути пізніше';
+    el.textContent = t('finishMustBeLater');
     el.classList.add('invalid');
     return;
   }
   if ((e - s) - (editDraft.breakMin || 0) <= 0) {
-    el.textContent = 'перерва задовга';
+    el.textContent = t('breakTooLong');
     el.classList.add('invalid');
     return;
   }
@@ -1102,7 +1298,7 @@ function saveDayEdit() {
 }
 
 function deleteDayEdit() {
-  if (!confirm('Очистити запис за цей день?')) return;
+  if (!confirm(t('clearEntryConfirm'))) return;
   delete state.days[editingDate];
   save();
   vibrate(20);
@@ -1124,71 +1320,87 @@ function openSettings() {
     <div class="modal-overlay" id="modalOverlay">
       <div class="modal">
         <div class="modal-header">
-          <div class="modal-title">Звіт</div>
+          <div class="modal-title">${t('report')}</div>
           <button class="modal-close" id="closeModal">×</button>
         </div>
 
         <div class="settings-section">
-          <h3>Статистика</h3>
+          <h3>${t('statistics')}</h3>
           ${stats.totalHours > 0 ? `
             <div class="stats">
               <div class="stats-grid">
                 <div class="stat-cell">
-                  <div class="stat-label">Усього годин</div>
+                  <div class="stat-label">${t('totalHours')}</div>
                   <div class="stat-value accent">${fmtHours(stats.totalHours)}</div>
                 </div>
                 <div class="stat-cell">
-                  <div class="stat-label">Робочих днів</div>
+                  <div class="stat-label">${t('workDays')}</div>
                   <div class="stat-value">${stats.workDays}</div>
                 </div>
                 <div class="stat-cell">
-                  <div class="stat-label">В середньому за день</div>
-                  <div class="stat-value small">${fmtHours(stats.avgPerDay)} год</div>
+                  <div class="stat-label">${t('avgPerDay')}</div>
+                  <div class="stat-value small">${fmtHours(stats.avgPerDay)} ${t('hours')}</div>
                 </div>
                 <div class="stat-cell">
-                  <div class="stat-label">Тижнів</div>
+                  <div class="stat-label">${t('weeksCount')}</div>
                   <div class="stat-value small">${stats.weeksCount}</div>
                 </div>
                 ${stats.weeksCount > 0 ? `
                   <div class="stat-cell full">
-                    <div class="stat-label">В середньому за тиждень</div>
-                    <div class="stat-value small">${fmtHours(stats.avgPerWeek)} год</div>
+                    <div class="stat-label">${t('avgPerWeek')}</div>
+                    <div class="stat-value small">${fmtHours(stats.avgPerWeek)} ${t('hours')}</div>
                   </div>
                 ` : ''}
               </div>
             </div>
           ` : `
-            <div class="stats-empty">Поки що немає записів</div>
+            <div class="stats-empty">${t('noRecords')}</div>
           `}
         </div>
 
         <div class="settings-section">
-          <h3>Надіслати звіт</h3>
+          <h3>${t('sendReport')}</h3>
           <button class="export-btn" id="exportWeek">
-            <span class="label">Поточний тиждень</span>
+            <span class="label">${t('currentWeek')}</span>
             <span class="arrow">→</span>
           </button>
           <button class="export-btn" id="exportAll" ${stats.totalHours === 0 ? 'disabled style="opacity:0.4"' : ''}>
-            <span class="label">Повний звіт <span style="color: var(--text-dim); font-family: var(--mono); font-size: 12px;">усі тижні</span></span>
+            <span class="label">${t('fullReport')} <span style="color: var(--text-dim); font-family: var(--mono); font-size: 12px;">${t('allWeeks')}</span></span>
             <span class="arrow">→</span>
           </button>
         </div>
 
         <div class="settings-section">
-          <h3>Працівник</h3>
-          <input type="text" id="nameInput" value="${escapeHtml(state.workerName)}" placeholder="Введіть імʼя">
+          <h3>${t('worker')}</h3>
+          <input type="text" id="nameInput" value="${escapeHtml(state.workerName)}" placeholder="${t('enterName')}">
         </div>
 
         <div class="settings-section">
-          <h3>Дані</h3>
+          <h3>${t('appearance')}</h3>
+          <div class="seg" style="margin-bottom: 0;">
+            <button id="themeDark" class="${state.theme === 'dark' ? 'active' : ''}">${t('dark')}</button>
+            <button id="themeLight" class="${state.theme === 'light' ? 'active' : ''}">${t('light')}</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>${t('language')}</h3>
+          <div class="seg" style="margin-bottom: 0;">
+            <button id="langUk" class="${state.lang === 'uk' ? 'active' : ''}">UK</button>
+            <button id="langEn" class="${state.lang === 'en' ? 'active' : ''}">EN</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>${t('data')}</h3>
           <button class="export-btn" id="clearAll" style="color: var(--danger);">
-            <span class="label" style="color: var(--danger);">Видалити всі записи</span>
+            <span class="label" style="color: var(--danger);">${t('deleteAll')}</span>
             <span class="arrow" style="color: var(--danger);">×</span>
           </button>
         </div>
 
         <div class="btn-row" style="grid-template-columns: 1fr;">
-          <button class="btn btn-primary" id="saveSettings">Готово</button>
+          <button class="btn btn-primary" id="saveSettings">${t('done')}</button>
         </div>
       </div>
     </div>
@@ -1210,13 +1422,36 @@ function openSettings() {
     });
   }
   document.getElementById('clearAll').addEventListener('click', () => {
-    if (confirm('Видалити всі записи назавжди? Ця дія незворотна.')) {
+    if (confirm(t('deleteAllConfirm'))) {
       state.days = {};
       save();
       closeModal();
       render();
     }
   });
+  document.getElementById('themeDark').addEventListener('click', () => setTheme('dark'));
+  document.getElementById('themeLight').addEventListener('click', () => setTheme('light'));
+  document.getElementById('langUk').addEventListener('click', () => setLang('uk'));
+  document.getElementById('langEn').addEventListener('click', () => setLang('en'));
+
+  function setTheme(theme) {
+    state.theme = theme;
+    save();
+    applyTheme(theme);
+    document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+    document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+  }
+
+  function setLang(lang) {
+    state.lang = lang;
+    save();
+    applyLang(lang);
+    // Перерендеримо модалку, бо всі підписи залежать від мови
+    saveName();
+    closeModal();
+    render();
+    openSettings();
+  }
 
   function saveName() {
     state.workerName = document.getElementById('nameInput').value.trim();
@@ -1315,7 +1550,7 @@ function buildReportHtml(scope) {
     for (const d of weekDates(monday)) {
       const iso = isoDate(d);
       const day = state.days[iso];
-      const dayShort = DAY_NAMES_SHORT[d.getDay()];
+      const dayShort = DAY_NAMES_SHORT[state.lang][d.getDay()];
 
       if (!day) {
         dayRowsHtml.push(`
@@ -1332,7 +1567,7 @@ function buildReportHtml(scope) {
           <tr>
             <td class="day-name">${dayShort}</td>
             <td class="date">${ddmmyyyy(d)}</td>
-            <td class="time dim" colspan="2" style="text-align:center; font-style:italic;">вихідний</td>
+            <td class="time dim" colspan="2" style="text-align:center; font-style:italic;">${t('pdfDayOff')}</td>
             <td class="num dim">—</td>
           </tr>`);
       } else {
@@ -1367,7 +1602,7 @@ function buildReportHtml(scope) {
       const showRunning = scope.type === 'all';
       const sectionClass = showHeading ? '' : 'no-heading';
       const headingHtml = showHeading
-        ? `<h2><span class="week-num">Тиждень ${weekIdx}</span>${formatWeekRange(monday)}</h2>`
+        ? `<h2><span class="week-num">${t('pdfWeek')} ${weekIdx}</span>${formatWeekRange(monday)}</h2>`
         : '';
       weeksHtml.push(`
         <section class="week-section ${sectionClass}">
@@ -1375,23 +1610,23 @@ function buildReportHtml(scope) {
           <table>
             <thead>
               <tr>
-                <th>День</th>
-                <th>Дата</th>
-                <th>Старт</th>
-                <th>Фініш</th>
-                <th class="num">Тривалість</th>
+                <th>${t('pdfDay')}</th>
+                <th>${t('pdfDate')}</th>
+                <th>${t('pdfStart')}</th>
+                <th>${t('pdfFinish')}</th>
+                <th class="num">${t('pdfDuration')}</th>
               </tr>
             </thead>
             <tbody>${dayRowsHtml.join('')}</tbody>
             <tfoot>
               <tr>
-                <td colspan="4" class="total-label">Підсумок тижня</td>
-                <td class="num">${fmtHours(weekHours)} год</td>
+                <td colspan="4" class="total-label">${t('pdfWeekSummary')}</td>
+                <td class="num">${fmtHours(weekHours)} ${t('hours')}</td>
               </tr>
               ${showRunning ? `
               <tr class="running-row">
-                <td colspan="4" class="total-label">Накопичено від початку</td>
-                <td class="num">${fmtHours(running)} год</td>
+                <td colspan="4" class="total-label">${t('pdfRunningTotal')}</td>
+                <td class="num">${fmtHours(running)} ${t('hours')}</td>
               </tr>
               ` : ''}
             </tfoot>
@@ -1406,22 +1641,22 @@ function buildReportHtml(scope) {
 
   if (scope.type === 'week' && !hasAnyContent) return null;
 
-  const workerName = state.workerName || '(імʼя не вказано)';
+  const workerName = state.workerName || t('pdfNoName');
 
   // Великий центральний підсумок — лише для повного звіту.
   // У тижневому він дублює "Підсумок тижня" в tfoot, тому пропускаємо.
   const grandTotalHtml = scope.type === 'all'
     ? `
       <div class="grand-total">
-        <div class="label">Усього за період</div>
-        <div class="value">${fmtHours(totalHours)}<span class="unit">год</span></div>
-        <div class="breakdown">${totalWorkDays} робочих днів · ${activeWeeks} ${pluralWeeks(activeWeeks)}</div>
+        <div class="label">${t('pdfTotalForPeriod')}</div>
+        <div class="value">${fmtHours(totalHours)}<span class="unit">${t('hours')}</span></div>
+        <div class="breakdown">${totalWorkDays} ${t('pdfWorkDaysLabel')} · ${activeWeeks} ${pluralWeeks(activeWeeks)}</div>
       </div>
     `
     : '';
 
   document.getElementById('printArea').innerHTML = `
-    <h1>Години</h1>
+    <h1>${t('pdfTitle')}</h1>
     <div class="meta">
       ${escapeHtml(workerName)}<br>
       ${titleSuffix}
@@ -1438,15 +1673,6 @@ function buildReportHtml(scope) {
   };
 }
 
-function pluralWeeks(n) {
-  // 1 тиждень, 2-4 тижні, 5+ тижнів
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'тиждень';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'тижні';
-  return 'тижнів';
-}
-
 function weekIndexOf(monday) {
   const dates = Object.keys(state.days).sort();
   if (dates.length === 0) return 1;
@@ -1458,7 +1684,7 @@ function weekIndexOf(monday) {
 async function exportPdf(scope) {
   const meta = buildReportHtml(scope);
   if (!meta) {
-    alert('Немає даних для експорту.');
+    alert(t('pdfNoData'));
     return;
   }
 
@@ -1529,8 +1755,8 @@ async function exportPdf(scope) {
       try {
         await navigator.share({
           files: [file],
-          title: 'Облік робочого часу',
-          text: state.workerName ? `Звіт: ${state.workerName}` : 'Звіт'
+          title: t('pdfShareTitle'),
+          text: state.workerName ? `${t('pdfShareReport')}: ${state.workerName}` : t('pdfShareReport')
         });
         vibrate([10, 30, 10]);
       } catch (err) {
@@ -1546,7 +1772,7 @@ async function exportPdf(scope) {
     }
   } catch (e) {
     console.error('PDF export failed', e);
-    alert('Не вдалося згенерувати PDF. Перевір підключення до інтернету (для першого експорту потрібен інтернет).');
+    alert(t('pdfErrorMessage'));
   } finally {
     printArea.style.display = 'none';
     printArea.style.position = '';
@@ -1589,8 +1815,38 @@ document.getElementById('datePicker').addEventListener('change', (e) => {
 });
 document.getElementById('settingsBtn').addEventListener('click', openSettings);
 
+// ============ THEME ============
+// Застосовує тему: data-theme атрибут на <html> + оновлює meta theme-color
+// (theme-color визначає колір системної смужки в Android Chrome PWA)
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const meta = document.getElementById('metaThemeColor');
+  if (meta) {
+    meta.setAttribute('content', theme === 'light' ? '#f7f3eb' : '#0a0a0a');
+  }
+}
+
+// ============ LANGUAGE ============
+// Застосовує мову: міняє <html lang>, <title>, footer-label
+// (важливо для скрін-рідерів і коректного перенесення слів)
+function applyLang(lang) {
+  document.documentElement.setAttribute('lang', lang);
+  document.title = t('appTitle');
+  const footerLabel = document.getElementById('footerLabel');
+  if (footerLabel) footerLabel.textContent = t('weekTotalLabel');
+}
+
+// ============ SERVICE WORKER ============
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
 // ============ INIT ============
 load();
+applyTheme(state.theme);
+applyLang(state.lang);
 render();
 </script>
 </body>
