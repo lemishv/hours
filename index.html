@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Облік часу</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg-elev: #161616;
+    --bg-elev-2: #1f1f1f;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --text-dim: #888;
+    --text-faint: #555;
+    --accent: #d4a574;
+    --accent-dim: #8a6a4a;
+    --danger: #c45a5a;
+    --serif: 'Fraunces', Georgia, serif;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.4;
+    overscroll-behavior: none;
+    height: 100%;
+  }
+
+  body {
+    /* dynamic viewport - враховує адресну стрічку браузера */
+    height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    display: flex;
+    flex-direction: column;
+  }
+
+  button { font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; font-size: inherit; }
+
+  input, select {
+    font-family: var(--mono);
+    color: var(--text);
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 17px;
+    width: 100%;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input[type="time"] { font-variant-numeric: tabular-nums; }
+
+  /* HEADER */
+  header {
+    display: grid;
+    grid-template-columns: 44px 1fr 44px 44px;
+    align-items: center;
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border);
+    gap: 4px;
+  }
+
+  .nav-btn {
+    height: 44px;
+    width: 44px;
+    display: grid;
+    place-items: center;
+    color: var(--text-dim);
+    font-size: 24px;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+  .nav-btn:active { background: var(--bg-elev); }
+
+  .week-title {
+    position: relative;
+    text-align: center;
+    font-family: var(--serif);
+    font-weight: 500;
+    padding: 8px;
+    border-radius: 8px;
+    transition: background 0.15s;
+    line-height: 1.2;
+  }
+  .week-title:active { background: var(--bg-elev); }
+  .week-title .week-range { font-size: 17px; }
+  .week-title .week-num { font-size: 12px; color: var(--text-dim); font-family: var(--mono); margin-top: 2px; letter-spacing: 0.5px; }
+  .date-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    background: transparent;
+    /* приховує дефолтну іконку календаря в Chrome, щоб не лізла поверх */
+    color: transparent;
+  }
+  .date-overlay::-webkit-calendar-picker-indicator {
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    inset: 0;
+    cursor: pointer;
+  }
+
+  /* DAYS LIST */
+  main {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+
+  .day-row {
+    display: grid;
+    grid-template-columns: 44px 36px 1fr auto;
+    align-items: center;
+    padding: 16px 16px;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+    min-height: 64px;
+  }
+  .day-row:active { background: var(--bg-elev); }
+  .day-row.today { background: linear-gradient(90deg, rgba(212,165,116,0.06), transparent 60%); }
+  .day-row.today .day-name { color: var(--accent); }
+
+  .day-name {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+  }
+  .day-num {
+    font-family: var(--serif);
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--text);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .day-info {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .day-info.empty { color: var(--text-faint); font-style: italic; font-family: var(--serif); }
+  .day-info.dayoff { color: var(--text-dim); }
+  .day-hours {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* FOOTER (week total) */
+  footer {
+    border-top: 1px solid var(--border);
+    background: var(--bg-elev);
+    padding: 18px 16px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .footer-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+  }
+  .footer-value {
+    font-family: var(--serif);
+    font-size: 40px;
+    font-weight: 500;
+    color: #e8c090;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    letter-spacing: -0.5px;
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 100;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  .modal {
+    background: var(--bg-elev);
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    animation: slideUp 0.25s ease;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 20px;
+  }
+  .modal-title {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+  }
+  .modal-subtitle {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .modal-close {
+    color: var(--text-dim);
+    font-size: 24px;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+  }
+
+  /* SEGMENTED CONTROL */
+  .seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--bg-elev-2);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+    margin-bottom: 20px;
+  }
+  .seg button {
+    padding: 12px;
+    border-radius: 7px;
+    font-family: var(--serif);
+    font-size: 16px;
+    color: var(--text-dim);
+    transition: all 0.15s;
+  }
+  .seg button.active {
+    background: var(--bg);
+    color: var(--accent);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  /* FIELDS */
+  .field { margin-bottom: 16px; }
+  .field-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* BREAK SECTION */
+  .break-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    cursor: pointer;
+  }
+  .break-toggle input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--accent);
+  }
+  .break-toggle span { font-family: var(--serif); font-size: 16px; }
+
+  .break-options { display: none; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .break-options.visible { display: flex; }
+  .break-chip {
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--text-dim);
+    background: var(--bg-elev-2);
+  }
+  .break-chip.active { color: var(--accent); border-color: var(--accent); background: rgba(212,165,116,0.08); }
+
+  /* DURATION PREVIEW */
+  .duration-preview {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--bg-elev-2);
+    border-radius: 12px;
+    text-align: center;
+  }
+  .duration-preview .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .duration-preview .value {
+    font-family: var(--serif);
+    font-size: 36px;
+    font-weight: 500;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .duration-preview .value.invalid { color: var(--danger); font-size: 18px; }
+
+  /* BUTTONS */
+  .btn-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .btn {
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-family: var(--serif);
+    font-size: 17px;
+    font-weight: 500;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .btn-primary:active { background: var(--accent-dim); }
+  .btn-primary:disabled { background: var(--bg-elev-2); color: var(--text-faint); }
+  .btn-ghost {
+    color: var(--text-dim);
+    background: var(--bg-elev-2);
+  }
+  .btn-ghost:active { background: var(--border); }
+  .btn-danger {
+    color: var(--danger);
+    background: transparent;
+    border: 1px solid rgba(196, 90, 90, 0.3);
+    width: 100%;
+    margin-top: 12px;
+  }
+  .btn-danger:active { background: rgba(196, 90, 90, 0.1); }
+
+  /* SETTINGS */
+  .settings-section { margin-bottom: 24px; }
+  .settings-section h3 {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .export-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: var(--bg-elev-2);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    width: 100%;
+    transition: background 0.15s;
+  }
+  .export-btn:active { background: var(--border); }
+  .export-btn .label {
+    font-family: var(--serif);
+    font-size: 16px;
+    text-align: left;
+  }
+  .export-btn .arrow { color: var(--accent); font-size: 18px; }
+
+  /* HIDDEN UTILITY */
+  .hidden { display: none !important; }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  /* STATS */
+  .stats {
+    background: var(--bg-elev-2);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .stat-cell { display: flex; flex-direction: column; gap: 2px; }
+  .stat-cell.full { grid-column: 1 / -1; }
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-dim);
+  }
+  .stat-value {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.small { font-size: 16px; color: var(--text); }
+  .stats-empty {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-dim);
+    font-family: var(--serif);
+    font-style: italic;
+  }
+
+  /* PRINT / REPORT AREA — стилі для PDF-документа.
+     Не під @media print, бо потрібно щоб html2canvas їх бачив.
+     На екрані ховаємо через display: none. */
+  #printArea {
+    display: none;
+    background: white;
+    color: black;
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 11pt;
+    width: 794px; /* ~A4 ширина при 96dpi */
+    padding: 40px 36px;
+    box-sizing: border-box;
+  }
+  #printArea h1 {
+    font-size: 26pt;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+    letter-spacing: -0.5pt;
+    color: black;
+  }
+  #printArea .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10pt;
+    color: black;
+    margin-bottom: 32px;
+    line-height: 1.7;
+  }
+  #printArea .week-section {
+    margin-bottom: 26px;
+  }
+  #printArea .week-section h2 {
+    font-size: 13pt;
+    font-weight: 500;
+    margin: 0 0 8px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid black;
+    color: black;
+  }
+  #printArea .week-section h2 .week-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+    color: #777;
+    font-weight: 400;
+    letter-spacing: 0.8pt;
+    text-transform: uppercase;
+    margin-right: 14px;
+  }
+  /* Якщо немає h2 (тижневий звіт) — самостійна верхня лінія таблиці */
+  #printArea .week-section.no-heading table {
+    border-top: 1px solid black;
+  }
+  #printArea table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11pt;
+    table-layout: auto;
+  }
+  #printArea th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.8pt;
+    color: #777;
+    font-weight: 400;
+    text-align: left;
+    padding: 8px 14px;
+    border-bottom: 1px solid #999;
+    white-space: nowrap;
+  }
+  #printArea th.num { text-align: right; }
+  #printArea td {
+    padding: 6px 14px;
+    border-bottom: 1px solid #e8e8e8;
+    font-variant-numeric: tabular-nums;
+    color: black;
+    white-space: nowrap;
+  }
+  #printArea td.day-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10pt;
+    color: #666;
+  }
+  #printArea td.date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10pt;
+  }
+  #printArea td.time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10pt;
+  }
+  #printArea td.num {
+    text-align: right;
+    font-weight: 500;
+    font-size: 12pt;
+  }
+  #printArea td.dim { color: #aaa; }
+  #printArea tfoot td {
+    border-top: 1px solid black;
+    border-bottom: none;
+    padding-top: 10px;
+    font-weight: 600;
+    font-size: 12pt;
+  }
+  #printArea tfoot .total-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10pt;
+    text-transform: uppercase;
+    letter-spacing: 0.8pt;
+    color: black;
+    font-weight: 400;
+  }
+  #printArea tfoot .running-row td {
+    border-top: none;
+    padding-top: 2px;
+    padding-bottom: 4px;
+    font-weight: 400;
+    font-size: 9pt;
+  }
+  #printArea tfoot .running-row .total-label,
+  #printArea tfoot .running-row .num {
+    color: #777;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+  }
+  /* Великий центральний підсумок для повного звіту */
+  #printArea .grand-total {
+    margin-top: 36px;
+    padding-top: 20px;
+    border-top: 2px solid black;
+    text-align: center;
+  }
+  #printArea .grand-total .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11pt;
+    text-transform: uppercase;
+    letter-spacing: 1.5pt;
+    color: black;
+    font-weight: 400;
+    margin-bottom: 8px;
+  }
+  #printArea .grand-total .value {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 42pt;
+    font-weight: 600;
+    color: #b8864a;
+    line-height: 1;
+    letter-spacing: -1pt;
+  }
+  #printArea .grand-total .value .unit {
+    font-size: 18pt;
+    font-weight: 400;
+    color: #b8864a;
+    margin-left: 6px;
+  }
+  #printArea .grand-total .breakdown {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+    font-weight: 400;
+    color: #777;
+    margin-top: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8pt;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="nav-btn" id="prevWeek" aria-label="Попередній тиждень">‹</button>
+  <button class="week-title" id="weekTitle">
+    <div class="week-range" id="weekRange">—</div>
+    <div class="week-num" id="weekNum"></div>
+    <input type="date" id="datePicker" class="date-overlay" aria-label="Вибрати дату">
+  </button>
+  <button class="nav-btn" id="nextWeek" aria-label="Наступний тиждень">›</button>
+  <button class="nav-btn" id="settingsBtn" aria-label="Налаштування">⚙</button>
+</header>
+
+<main id="daysContainer"></main>
+
+<footer>
+  <div class="footer-label">За тиждень</div>
+  <div class="footer-value" id="weekTotal">0.0</div>
+</footer>
+
+<div id="modalRoot"></div>
+<div id="printArea"></div>
+
+<script>
+'use strict';
+
+// ============ CONSTANTS ============
+const STORAGE_KEY = 'workhours.v1';
+const DAY_NAMES_SHORT = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'];
+const DAY_NAMES_LONG = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
+const MONTH_GENITIVE = ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
+const MONTH_SHORT = ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
+
+// ============ STATE ============
+let state = {
+  workerName: '',
+  days: {} // { 'YYYY-MM-DD': { start: '08:00', end: '17:00', breakMin: 0, dayOff: false } }
+};
+let currentMonday = mondayOf(new Date());
+let editingDate = null;
+let editDraft = null;
+
+// ============ STORAGE ============
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        state.workerName = parsed.workerName || '';
+        state.days = parsed.days || {};
+      }
+    }
+  } catch (e) {
+    console.warn('Load failed', e);
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.warn('Save failed', e);
+  }
+}
+
+// ============ DATE HELPERS ============
+function mondayOf(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function isoDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function ddmmyyyy(date) {
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const y = date.getFullYear();
+  return `${d}.${m}.${y}`;
+}
+
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth() === b.getMonth() &&
+         a.getDate() === b.getDate();
+}
+
+function weekDates(monday) {
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+}
+
+function formatWeekRange(monday) {
+  const sunday = addDays(monday, 6);
+  const m1 = MONTH_SHORT[monday.getMonth()];
+  const m2 = MONTH_SHORT[sunday.getMonth()];
+  const y1 = monday.getFullYear();
+  const y2 = sunday.getFullYear();
+  if (m1 === m2 && y1 === y2) {
+    return `${monday.getDate()}–${sunday.getDate()} ${m1} ${y1}`;
+  }
+  if (y1 === y2) {
+    return `${monday.getDate()} ${m1} – ${sunday.getDate()} ${m2} ${y1}`;
+  }
+  return `${monday.getDate()} ${m1} ${y1} – ${sunday.getDate()} ${m2} ${y2}`;
+}
+
+function formatLongDay(date) {
+  const dn = DAY_NAMES_LONG[date.getDay()];
+  return `${dn}, ${date.getDate()} ${MONTH_GENITIVE[date.getMonth()]}`;
+}
+
+// ============ TIME / DURATION ============
+function timeToMinutes(t) {
+  if (!t) return null;
+  const [h, m] = t.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+function calcDurationHours(day) {
+  if (!day || day.dayOff) return null;
+  if (!day.start || !day.end) return null;
+  const s = timeToMinutes(day.start);
+  let e = timeToMinutes(day.end);
+  if (s == null || e == null) return null;
+  if (e <= s) return null; // нічна зміна — обговоримо потім
+  const total = e - s - (day.breakMin || 0);
+  if (total <= 0) return null;
+  return total / 60;
+}
+
+function fmtHours(h) {
+  if (h == null) return '—';
+  // 1 знак після коми, завжди (8.0, 8.5)
+  const v = Math.round(h * 10) / 10;
+  return v.toFixed(1);
+}
+
+// ============ TOTALS ============
+function weekTotal(monday) {
+  let sum = 0;
+  for (const d of weekDates(monday)) {
+    const day = state.days[isoDate(d)];
+    const h = calcDurationHours(day);
+    if (h != null) sum += h;
+  }
+  return sum;
+}
+
+function totalUpToWeek(monday) {
+  // сума всіх записів, де дата ≤ неділі цього тижня
+  const sundayIso = isoDate(addDays(monday, 6));
+  let sum = 0;
+  for (const [iso, day] of Object.entries(state.days)) {
+    if (iso > sundayIso) continue;
+    const h = calcDurationHours(day);
+    if (h != null) sum += h;
+  }
+  return sum;
+}
+
+// ============ HAPTICS ============
+function vibrate(pattern) {
+  if (navigator.vibrate) {
+    try { navigator.vibrate(pattern); } catch (_) {}
+  }
+}
+
+// ============ RENDER ============
+function render() {
+  renderHeader();
+  renderDays();
+  renderTotals();
+}
+
+function renderHeader() {
+  document.getElementById('weekRange').textContent = formatWeekRange(currentMonday);
+  // показуємо коротко: тиждень N (рахуємо від першого запису)
+  const weekNumText = computeWeekLabel();
+  document.getElementById('weekNum').textContent = weekNumText;
+}
+
+function computeWeekLabel() {
+  // Якщо є записи — нумеруємо тижні від тижня першого запису.
+  // Інакше — порожній текст.
+  const dates = Object.keys(state.days).sort();
+  if (dates.length === 0) return '';
+  const firstIso = dates[0];
+  const firstMonday = mondayOf(new Date(firstIso));
+  const diffDays = Math.round((currentMonday - firstMonday) / 86400000);
+  const weekIdx = Math.floor(diffDays / 7) + 1;
+  if (weekIdx < 1) return '';
+  return `тиждень ${weekIdx}`;
+}
+
+function renderDays() {
+  const container = document.getElementById('daysContainer');
+  container.innerHTML = '';
+  const today = new Date();
+  for (const date of weekDates(currentMonday)) {
+    const iso = isoDate(date);
+    const day = state.days[iso];
+    const row = document.createElement('button');
+    row.className = 'day-row' + (sameDay(date, today) ? ' today' : '');
+    row.dataset.iso = iso;
+
+    const dayName = document.createElement('div');
+    dayName.className = 'day-name';
+    dayName.textContent = DAY_NAMES_SHORT[date.getDay()];
+
+    const dayNum = document.createElement('div');
+    dayNum.className = 'day-num';
+    dayNum.textContent = date.getDate();
+
+    const info = document.createElement('div');
+    info.className = 'day-info';
+
+    const hours = document.createElement('div');
+    hours.className = 'day-hours';
+
+    if (!day) {
+      info.classList.add('empty');
+      info.textContent = '+ додати час';
+    } else if (day.dayOff) {
+      info.classList.add('dayoff');
+      info.textContent = 'вихідний';
+    } else if (day.start && day.end) {
+      info.textContent = `${day.start} → ${day.end}`;
+      if (day.breakMin) {
+        info.textContent += ` · ${day.breakMin}хв`;
+      }
+      const h = calcDurationHours(day);
+      hours.textContent = fmtHours(h);
+    } else {
+      info.classList.add('empty');
+      info.textContent = '+ додати час';
+    }
+
+    row.appendChild(dayName);
+    row.appendChild(dayNum);
+    row.appendChild(info);
+    row.appendChild(hours);
+    row.addEventListener('click', () => openDayEditor(iso));
+    container.appendChild(row);
+  }
+}
+
+function renderTotals() {
+  document.getElementById('weekTotal').textContent = fmtHours(weekTotal(currentMonday));
+}
+
+// ============ DAY EDITOR ============
+function openDayEditor(iso) {
+  editingDate = iso;
+  const existing = state.days[iso];
+  editDraft = existing
+    ? { ...existing }
+    : { start: '08:00', end: '17:00', breakMin: 0, dayOff: false };
+  if (editDraft.breakMin === undefined) editDraft.breakMin = 0;
+  if (editDraft.dayOff === undefined) editDraft.dayOff = false;
+  renderDayEditor();
+}
+
+function renderDayEditor() {
+  const date = new Date(editingDate);
+  const draft = editDraft;
+  const isWork = !draft.dayOff;
+  const hasBreak = !!draft.breakMin;
+
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" id="modal">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">${formatLongDay(date)}</div>
+            <div class="modal-subtitle">${ddmmyyyy(date)}</div>
+          </div>
+          <button class="modal-close" id="closeModal">×</button>
+        </div>
+
+        <div class="seg">
+          <button id="segWork" class="${isWork ? 'active' : ''}">Робочий день</button>
+          <button id="segOff" class="${!isWork ? 'active' : ''}">Вихідний</button>
+        </div>
+
+        <div id="workFields" class="${isWork ? '' : 'hidden'}">
+          <div class="field-row">
+            <div class="field">
+              <label class="field-label">Старт</label>
+              <input type="time" id="inputStart" value="${draft.start || ''}">
+            </div>
+            <div class="field">
+              <label class="field-label">Фініш</label>
+              <input type="time" id="inputEnd" value="${draft.end || ''}">
+            </div>
+          </div>
+
+          <label class="break-toggle">
+            <input type="checkbox" id="breakCheck" ${hasBreak ? 'checked' : ''}>
+            <span>Була перерва</span>
+          </label>
+          <div class="break-options ${hasBreak ? 'visible' : ''}" id="breakOptions">
+            ${[15, 30, 45, 60].map(m => `
+              <button class="break-chip ${draft.breakMin === m ? 'active' : ''}" data-min="${m}">${m} хв</button>
+            `).join('')}
+            <input type="number" id="breakCustom" min="1" max="480" placeholder="інше"
+              value="${hasBreak && ![15,30,45,60].includes(draft.breakMin) ? draft.breakMin : ''}"
+              style="width: 90px; padding: 8px 12px; font-size: 14px;">
+          </div>
+
+          <div class="duration-preview">
+            <div class="label">Тривалість</div>
+            <div class="value" id="durationPreview">—</div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="cancelBtn">Скасувати</button>
+          <button class="btn btn-primary" id="saveBtn">Зберегти</button>
+        </div>
+
+        ${state.days[editingDate] ? `
+          <button class="btn btn-danger" id="deleteBtn">Очистити запис</button>
+        ` : ''}
+      </div>
+    </div>
+  `;
+
+  // bindings
+  document.getElementById('modalOverlay').addEventListener('click', (e) => {
+    if (e.target.id === 'modalOverlay') closeModal();
+  });
+  document.getElementById('closeModal').addEventListener('click', closeModal);
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  document.getElementById('saveBtn').addEventListener('click', saveDayEdit);
+
+  document.getElementById('segWork').addEventListener('click', () => {
+    editDraft.dayOff = false;
+    renderDayEditor();
+  });
+  document.getElementById('segOff').addEventListener('click', () => {
+    editDraft.dayOff = true;
+    renderDayEditor();
+  });
+
+  if (isWork) {
+    document.getElementById('inputStart').addEventListener('change', (e) => {
+      editDraft.start = e.target.value;
+      updateDurationPreview();
+    });
+    document.getElementById('inputEnd').addEventListener('change', (e) => {
+      editDraft.end = e.target.value;
+      updateDurationPreview();
+    });
+    document.getElementById('breakCheck').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        editDraft.breakMin = editDraft.breakMin || 30;
+      } else {
+        editDraft.breakMin = 0;
+      }
+      renderDayEditor();
+    });
+    document.querySelectorAll('.break-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        editDraft.breakMin = Number(chip.dataset.min);
+        renderDayEditor();
+      });
+    });
+    document.getElementById('breakCustom').addEventListener('input', (e) => {
+      const v = Number(e.target.value);
+      if (v > 0) {
+        editDraft.breakMin = v;
+        // подсветка чипів
+        document.querySelectorAll('.break-chip').forEach(c => c.classList.remove('active'));
+        updateDurationPreview();
+      }
+    });
+    updateDurationPreview();
+  }
+
+  if (state.days[editingDate]) {
+    document.getElementById('deleteBtn').addEventListener('click', deleteDayEdit);
+  }
+}
+
+function updateDurationPreview() {
+  const el = document.getElementById('durationPreview');
+  if (!el) return;
+  const h = calcDurationHours(editDraft);
+  if (h != null) {
+    el.classList.remove('invalid');
+    el.textContent = fmtHours(h) + ' год';
+    return;
+  }
+  // h == null — щось не так. Показуємо чому.
+  if (!editDraft.start || !editDraft.end) {
+    el.classList.remove('invalid');
+    el.textContent = '—';
+    return;
+  }
+  const s = timeToMinutes(editDraft.start);
+  const e = timeToMinutes(editDraft.end);
+  if (s == null || e == null) {
+    el.classList.remove('invalid');
+    el.textContent = '—';
+    return;
+  }
+  if (e <= s) {
+    el.textContent = 'фініш має бути пізніше';
+    el.classList.add('invalid');
+    return;
+  }
+  if ((e - s) - (editDraft.breakMin || 0) <= 0) {
+    el.textContent = 'перерва задовга';
+    el.classList.add('invalid');
+    return;
+  }
+  el.classList.remove('invalid');
+  el.textContent = '—';
+}
+
+function saveDayEdit() {
+  if (editDraft.dayOff) {
+    state.days[editingDate] = { dayOff: true };
+  } else {
+    const h = calcDurationHours(editDraft);
+    if (h == null) {
+      vibrate(20);
+      // підсвітимо превʼю
+      const el = document.getElementById('durationPreview');
+      if (el && !el.textContent.includes('—')) {
+        // вже показано помилку
+      }
+      return;
+    }
+    state.days[editingDate] = {
+      start: editDraft.start,
+      end: editDraft.end,
+      breakMin: editDraft.breakMin || 0,
+      dayOff: false
+    };
+  }
+  save();
+  vibrate([10, 30, 10]);
+  closeModal();
+  render();
+}
+
+function deleteDayEdit() {
+  if (!confirm('Очистити запис за цей день?')) return;
+  delete state.days[editingDate];
+  save();
+  vibrate(20);
+  closeModal();
+  render();
+}
+
+function closeModal() {
+  document.getElementById('modalRoot').innerHTML = '';
+  editingDate = null;
+  editDraft = null;
+}
+
+// ============ SETTINGS / REPORT ============
+function openSettings() {
+  const stats = computeStats();
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">Звіт</div>
+          <button class="modal-close" id="closeModal">×</button>
+        </div>
+
+        <div class="settings-section">
+          <h3>Статистика</h3>
+          ${stats.totalHours > 0 ? `
+            <div class="stats">
+              <div class="stats-grid">
+                <div class="stat-cell">
+                  <div class="stat-label">Усього годин</div>
+                  <div class="stat-value accent">${fmtHours(stats.totalHours)}</div>
+                </div>
+                <div class="stat-cell">
+                  <div class="stat-label">Робочих днів</div>
+                  <div class="stat-value">${stats.workDays}</div>
+                </div>
+                <div class="stat-cell">
+                  <div class="stat-label">В середньому за день</div>
+                  <div class="stat-value small">${fmtHours(stats.avgPerDay)} год</div>
+                </div>
+                <div class="stat-cell">
+                  <div class="stat-label">Тижнів</div>
+                  <div class="stat-value small">${stats.weeksCount}</div>
+                </div>
+                ${stats.weeksCount > 0 ? `
+                  <div class="stat-cell full">
+                    <div class="stat-label">В середньому за тиждень</div>
+                    <div class="stat-value small">${fmtHours(stats.avgPerWeek)} год</div>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          ` : `
+            <div class="stats-empty">Поки що немає записів</div>
+          `}
+        </div>
+
+        <div class="settings-section">
+          <h3>Надіслати звіт</h3>
+          <button class="export-btn" id="exportWeek">
+            <span class="label">Поточний тиждень</span>
+            <span class="arrow">→</span>
+          </button>
+          <button class="export-btn" id="exportAll" ${stats.totalHours === 0 ? 'disabled style="opacity:0.4"' : ''}>
+            <span class="label">Повний звіт <span style="color: var(--text-dim); font-family: var(--mono); font-size: 12px;">усі тижні</span></span>
+            <span class="arrow">→</span>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <h3>Працівник</h3>
+          <input type="text" id="nameInput" value="${escapeHtml(state.workerName)}" placeholder="Введіть імʼя">
+        </div>
+
+        <div class="settings-section">
+          <h3>Дані</h3>
+          <button class="export-btn" id="clearAll" style="color: var(--danger);">
+            <span class="label" style="color: var(--danger);">Видалити всі записи</span>
+            <span class="arrow" style="color: var(--danger);">×</span>
+          </button>
+        </div>
+
+        <div class="btn-row" style="grid-template-columns: 1fr;">
+          <button class="btn btn-primary" id="saveSettings">Готово</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('modalOverlay').addEventListener('click', (e) => {
+    if (e.target.id === 'modalOverlay') saveAndClose();
+  });
+  document.getElementById('closeModal').addEventListener('click', saveAndClose);
+  document.getElementById('saveSettings').addEventListener('click', saveAndClose);
+  document.getElementById('exportWeek').addEventListener('click', () => {
+    saveName();
+    exportPdf({ type: 'week', monday: currentMonday });
+  });
+  if (stats.totalHours > 0) {
+    document.getElementById('exportAll').addEventListener('click', () => {
+      saveName();
+      exportPdf({ type: 'all' });
+    });
+  }
+  document.getElementById('clearAll').addEventListener('click', () => {
+    if (confirm('Видалити всі записи назавжди? Ця дія незворотна.')) {
+      state.days = {};
+      save();
+      closeModal();
+      render();
+    }
+  });
+
+  function saveName() {
+    state.workerName = document.getElementById('nameInput').value.trim();
+    save();
+  }
+
+  function saveAndClose() {
+    saveName();
+    closeModal();
+  }
+}
+
+// Загальна статистика по всіх записах
+function computeStats() {
+  const dates = Object.keys(state.days).sort();
+  let totalHours = 0;
+  let workDays = 0;
+  const weekKeys = new Set();
+  for (const iso of dates) {
+    const day = state.days[iso];
+    const h = calcDurationHours(day);
+    if (h != null) {
+      totalHours += h;
+      workDays++;
+    }
+    // тиждень — за понеділком
+    if (h != null || (day && day.dayOff)) {
+      const m = mondayOf(new Date(iso));
+      weekKeys.add(isoDate(m));
+    }
+  }
+  return {
+    totalHours,
+    workDays,
+    weeksCount: weekKeys.size,
+    avgPerDay: workDays > 0 ? totalHours / workDays : 0,
+    avgPerWeek: weekKeys.size > 0 ? totalHours / weekKeys.size : 0
+  };
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// ============ HELPERS ============
+function runningTotalBeforeWeek(monday) {
+  const mondayIso = isoDate(monday);
+  let sum = 0;
+  for (const [iso, day] of Object.entries(state.days)) {
+    if (iso >= mondayIso) continue;
+    const h = calcDurationHours(day);
+    if (h != null) sum += h;
+  }
+  return sum;
+}
+
+// ============ PDF REPORT ============
+// Будує HTML-звіт у #printArea і повертає метадані для імені файлу.
+// scope: { type: 'week', monday } або { type: 'all' }
+function buildReportHtml(scope) {
+  const dates = Object.keys(state.days).sort();
+  if (dates.length === 0) return null;
+
+  let firstMonday, lastMonday, periodStart, periodEnd, titleSuffix;
+
+  if (scope.type === 'week') {
+    firstMonday = mondayOf(scope.monday);
+    lastMonday = new Date(firstMonday);
+    periodStart = firstMonday;
+    periodEnd = addDays(firstMonday, 6);
+    titleSuffix = formatWeekRange(firstMonday);
+  } else {
+    firstMonday = mondayOf(new Date(dates[0]));
+    lastMonday = mondayOf(new Date(dates[dates.length - 1]));
+    periodStart = new Date(dates[0]);
+    periodEnd = new Date(dates[dates.length - 1]);
+    titleSuffix = `${ddmmyyyy(periodStart)} – ${ddmmyyyy(periodEnd)}`;
+  }
+
+  const weeksHtml = [];
+  let monday = new Date(firstMonday);
+  let running = scope.type === 'week' ? runningTotalBeforeWeek(firstMonday) : 0;
+  let weekIdx = scope.type === 'week' ? weekIndexOf(firstMonday) : 1;
+  let totalHours = 0;
+  let totalWorkDays = 0;
+  let activeWeeks = 0;
+  let hasAnyContent = false;
+
+  while (monday <= lastMonday) {
+    let weekHours = 0;
+    let weekHasData = false;
+    const dayRowsHtml = [];
+
+    for (const d of weekDates(monday)) {
+      const iso = isoDate(d);
+      const day = state.days[iso];
+      const dayShort = DAY_NAMES_SHORT[d.getDay()];
+
+      if (!day) {
+        dayRowsHtml.push(`
+          <tr>
+            <td class="day-name">${dayShort}</td>
+            <td class="date">${ddmmyyyy(d)}</td>
+            <td class="time dim">—</td>
+            <td class="time dim">—</td>
+            <td class="num dim">—</td>
+          </tr>`);
+      } else if (day.dayOff) {
+        weekHasData = true;
+        dayRowsHtml.push(`
+          <tr>
+            <td class="day-name">${dayShort}</td>
+            <td class="date">${ddmmyyyy(d)}</td>
+            <td class="time dim" colspan="2" style="text-align:center; font-style:italic;">вихідний</td>
+            <td class="num dim">—</td>
+          </tr>`);
+      } else {
+        const h = calcDurationHours(day);
+        if (h != null) {
+          weekHours += h;
+          weekHasData = true;
+          totalWorkDays++;
+        }
+        dayRowsHtml.push(`
+          <tr>
+            <td class="day-name">${dayShort}</td>
+            <td class="date">${ddmmyyyy(d)}</td>
+            <td class="time">${day.start || '—'}</td>
+            <td class="time">${day.end || '—'}</td>
+            <td class="num">${h != null ? fmtHours(h) : '—'}</td>
+          </tr>`);
+      }
+    }
+
+    // Для тижневого звіту малюємо завжди, для повного — пропускаємо порожні
+    if (weekHasData || scope.type === 'week') {
+      running += weekHours;
+      totalHours += weekHours;
+      if (weekHasData) {
+        activeWeeks++;
+        hasAnyContent = true;
+      }
+      // У тижневому звіті заголовок секції не потрібен (дата вже в шапці).
+      // У повному — обовʼязковий, бо тижнів багато.
+      const showHeading = scope.type === 'all';
+      const showRunning = scope.type === 'all';
+      const sectionClass = showHeading ? '' : 'no-heading';
+      const headingHtml = showHeading
+        ? `<h2><span class="week-num">Тиждень ${weekIdx}</span>${formatWeekRange(monday)}</h2>`
+        : '';
+      weeksHtml.push(`
+        <section class="week-section ${sectionClass}">
+          ${headingHtml}
+          <table>
+            <thead>
+              <tr>
+                <th>День</th>
+                <th>Дата</th>
+                <th>Старт</th>
+                <th>Фініш</th>
+                <th class="num">Тривалість</th>
+              </tr>
+            </thead>
+            <tbody>${dayRowsHtml.join('')}</tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4" class="total-label">Підсумок тижня</td>
+                <td class="num">${fmtHours(weekHours)} год</td>
+              </tr>
+              ${showRunning ? `
+              <tr class="running-row">
+                <td colspan="4" class="total-label">Накопичено від початку</td>
+                <td class="num">${fmtHours(running)} год</td>
+              </tr>
+              ` : ''}
+            </tfoot>
+          </table>
+        </section>
+      `);
+      weekIdx++;
+    }
+
+    monday = addDays(monday, 7);
+  }
+
+  if (scope.type === 'week' && !hasAnyContent) return null;
+
+  const workerName = state.workerName || '(імʼя не вказано)';
+
+  // Великий центральний підсумок — лише для повного звіту.
+  // У тижневому він дублює "Підсумок тижня" в tfoot, тому пропускаємо.
+  const grandTotalHtml = scope.type === 'all'
+    ? `
+      <div class="grand-total">
+        <div class="label">Усього за період</div>
+        <div class="value">${fmtHours(totalHours)}<span class="unit">год</span></div>
+        <div class="breakdown">${totalWorkDays} робочих днів · ${activeWeeks} ${pluralWeeks(activeWeeks)}</div>
+      </div>
+    `
+    : '';
+
+  document.getElementById('printArea').innerHTML = `
+    <h1>Години</h1>
+    <div class="meta">
+      ${escapeHtml(workerName)}<br>
+      ${titleSuffix}
+    </div>
+    ${weeksHtml.join('')}
+    ${grandTotalHtml}
+  `;
+
+  return {
+    hasContent: hasAnyContent,
+    filename: scope.type === 'week'
+      ? `hodyny_tyzhden_${isoDate(firstMonday)}.pdf`
+      : `hodyny_zvit_${isoDate(periodStart)}_${isoDate(periodEnd)}.pdf`
+  };
+}
+
+function pluralWeeks(n) {
+  // 1 тиждень, 2-4 тижні, 5+ тижнів
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'тиждень';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'тижні';
+  return 'тижнів';
+}
+
+function weekIndexOf(monday) {
+  const dates = Object.keys(state.days).sort();
+  if (dates.length === 0) return 1;
+  const firstMonday = mondayOf(new Date(dates[0]));
+  const diffDays = Math.round((monday - firstMonday) / 86400000);
+  return Math.max(1, Math.floor(diffDays / 7) + 1);
+}
+
+async function exportPdf(scope) {
+  const meta = buildReportHtml(scope);
+  if (!meta) {
+    alert('Немає даних для експорту.');
+    return;
+  }
+
+  const printArea = document.getElementById('printArea');
+  // Тимчасово показуємо offscreen, щоб html2canvas міг відрендерити
+  printArea.style.display = 'block';
+  printArea.style.position = 'fixed';
+  printArea.style.left = '-10000px';
+  printArea.style.top = '0';
+
+  vibrate(15);
+
+  try {
+    // Чекаємо на шрифти, бо інакше html2canvas може зняти fallback
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+
+    const canvas = await html2canvas(printArea, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      logging: false,
+      useCORS: true
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+    const pageW = pdf.internal.pageSize.getWidth();   // 210
+    const pageH = pdf.internal.pageSize.getHeight();  // 297
+    const margin = 12;
+    const contentW = pageW - margin * 2;
+
+    const imgW = contentW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+
+    // Якщо все вміщується на одну сторінку
+    if (imgH <= pageH - margin * 2) {
+      pdf.addImage(canvas, 'JPEG', margin, margin, imgW, imgH, undefined, 'FAST');
+    } else {
+      // Багато сторінок: ріжемо canvas на частини, кожна = одна сторінка
+      const pxPerMm = canvas.width / imgW;
+      const pageHpx = (pageH - margin * 2) * pxPerMm;
+      let yOffset = 0;
+      let pageNum = 0;
+      while (yOffset < canvas.height) {
+        const sliceH = Math.min(pageHpx, canvas.height - yOffset);
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceH;
+        const ctx = sliceCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        ctx.drawImage(canvas, 0, yOffset, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+        if (pageNum > 0) pdf.addPage();
+        const sliceHmm = sliceH / pxPerMm;
+        pdf.addImage(sliceCanvas, 'JPEG', margin, margin, imgW, sliceHmm, undefined, 'FAST');
+        yOffset += sliceH;
+        pageNum++;
+      }
+    }
+
+    const blob = pdf.output('blob');
+    const file = new File([blob], meta.filename, { type: 'application/pdf' });
+
+    // Web Share API з файлом — рідне меню Android
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Облік робочого часу',
+          text: state.workerName ? `Звіт: ${state.workerName}` : 'Звіт'
+        });
+        vibrate([10, 30, 10]);
+      } catch (err) {
+        // Користувач закрив діалог — це не помилка
+        if (err.name !== 'AbortError') {
+          console.warn('Share failed, fallback to download', err);
+          downloadPdfBlob(blob, meta.filename);
+        }
+      }
+    } else {
+      // Fallback: просто скачати файл
+      downloadPdfBlob(blob, meta.filename);
+    }
+  } catch (e) {
+    console.error('PDF export failed', e);
+    alert('Не вдалося згенерувати PDF. Перевір підключення до інтернету (для першого експорту потрібен інтернет).');
+  } finally {
+    printArea.style.display = 'none';
+    printArea.style.position = '';
+    printArea.style.left = '';
+    printArea.style.top = '';
+  }
+}
+
+function downloadPdfBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
+
+// ============ EVENTS ============
+document.getElementById('prevWeek').addEventListener('click', () => {
+  currentMonday = addDays(currentMonday, -7);
+  render();
+});
+document.getElementById('nextWeek').addEventListener('click', () => {
+  currentMonday = addDays(currentMonday, 7);
+  render();
+});
+document.getElementById('datePicker').addEventListener('focus', (e) => {
+  // Перед відкриттям пікера підставляємо поточну дату тижня
+  e.target.value = isoDate(currentMonday);
+});
+document.getElementById('datePicker').addEventListener('change', (e) => {
+  if (e.target.value) {
+    currentMonday = mondayOf(new Date(e.target.value));
+    render();
+  }
+});
+document.getElementById('settingsBtn').addEventListener('click', openSettings);
+
+// ============ INIT ============
+load();
+render();
+</script>
+</body>
+</html>
