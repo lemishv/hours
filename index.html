@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0a0a0a" id="metaThemeColor">
+<meta name="theme-color" content="#ede0c4" id="metaThemeColor">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Облік часу</title>
 <link rel="manifest" href="manifest.json">
@@ -13,43 +13,104 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
+  /*
+    Чотири теми: паперова світла (дефолт), паперова темна,
+    термінал зелений, термінал янтарний.
+    Папір ділить більшість змінних з темою на тілі тег <html data-style="paper" data-mode="light">.
+    Термінал — окремий світ зі своїми правилами (моноширинний, сканлайни).
+
+    --serif і --mono лишаються глобально, бо стиль міняє лише ВАГУ типографіки в окремих місцях.
+  */
+
   :root {
-    --bg: #0a0a0a;
-    --bg-elev: #161616;
-    --bg-elev-2: #1f1f1f;
-    --border: #2a2a2a;
-    --text: #e8e8e8;
-    --text-dim: #888;
-    --text-faint: #555;
+    --serif: 'Fraunces', Georgia, serif;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+
+    /* Папір-світла (дефолт) — теплий кремовий */
+    --bg: #ede0c4;
+    --bg-elev: #e3d4b3;
+    --bg-elev-2: #d8c79f;
+    --border: #b8a47a;
+    --line: #c0aa7d;
+    --text: #2a1f14;
+    --text-dim: #6e5a3e;
+    --text-faint: #998560;
+    --accent: #a04515;       /* печаткова сангіна */
+    --accent-dim: #7a3410;
+    --danger: #983020;
+    --footer-value: #6b3408;
+    --modal-overlay-bg: rgba(40,28,12,0.45);
+    --seg-shadow: rgba(80,50,20,0.10);
+    --accent-tint: rgba(160,69,21,0.10);
+    --accent-tint-faint: rgba(160,69,21,0.05);
+    --noise-opacity: 0.6;
+    --noise-blend: multiply;
+  }
+
+  [data-style="paper"][data-mode="dark"] {
+    /* Папір-темна — горіхове дерево / стара шкіра */
+    --bg: #1c1610;
+    --bg-elev: #261d14;
+    --bg-elev-2: #2f2418;
+    --border: #4a3a26;
+    --line: #3d2f1e;
+    --text: #e8d8b6;
+    --text-dim: #a08b66;
+    --text-faint: #6a583c;
     --accent: #d4a574;
     --accent-dim: #8a6a4a;
     --danger: #c45a5a;
-    /* Темно-залежні відтінки, винесені в змінні задля світлої теми */
     --footer-value: #e8c090;
     --modal-overlay-bg: rgba(0,0,0,0.6);
-    --seg-shadow: rgba(0,0,0,0.3);
+    --seg-shadow: rgba(0,0,0,0.4);
     --accent-tint: rgba(212,165,116,0.08);
-    --accent-tint-faint: rgba(212,165,116,0.06);
-    --serif: 'Fraunces', Georgia, serif;
-    --mono: 'JetBrains Mono', 'Courier New', monospace;
+    --accent-tint-faint: rgba(212,165,116,0.05);
+    --noise-opacity: 0.25;
+    --noise-blend: screen;
   }
 
-  [data-theme="light"] {
-    --bg: #f7f3eb;
-    --bg-elev: #efe9dc;
-    --bg-elev-2: #e6deca;
-    --border: #d4c9ad;
-    --text: #1a1715;
-    --text-dim: #6e6557;
-    --text-faint: #a89e8a;
-    --accent: #b8864a;
-    --accent-dim: #8a6432;
-    --danger: #a93e3e;
-    --footer-value: #946530;
-    --modal-overlay-bg: rgba(40,30,15,0.4);
-    --seg-shadow: rgba(0,0,0,0.08);
-    --accent-tint: rgba(184,134,74,0.10);
-    --accent-tint-faint: rgba(184,134,74,0.07);
+  [data-style="terminal"][data-mode="green"] {
+    /* Термінал зелений */
+    --bg: #0a0e0a;
+    --bg-elev: #0e1410;
+    --bg-elev-2: #131c14;
+    --border: #1a3520;
+    --line: #1a3520;
+    --text: #4afa6e;
+    --text-dim: #2a8a3e;
+    --text-faint: #1a4a26;
+    --accent: #ffb000;       /* янтарний як акцент */
+    --accent-dim: #a06800;
+    --danger: #ff5050;
+    --footer-value: #ffb000;
+    --modal-overlay-bg: rgba(0,0,0,0.75);
+    --seg-shadow: rgba(0,0,0,0.5);
+    --accent-tint: rgba(255,176,0,0.08);
+    --accent-tint-faint: rgba(74,250,110,0.06);
+    --noise-opacity: 0;
+    --scanline-opacity: 0.4;
+  }
+
+  [data-style="terminal"][data-mode="amber"] {
+    /* Термінал янтарний — IBM CRT */
+    --bg: #0e0a05;
+    --bg-elev: #15100a;
+    --bg-elev-2: #1f1810;
+    --border: #3a2800;
+    --line: #3a2800;
+    --text: #ffb000;
+    --text-dim: #a06800;
+    --text-faint: #5a3a00;
+    --accent: #ffd060;
+    --accent-dim: #c08840;
+    --danger: #ff5050;
+    --footer-value: #ffd060;
+    --modal-overlay-bg: rgba(0,0,0,0.75);
+    --seg-shadow: rgba(0,0,0,0.5);
+    --accent-tint: rgba(255,208,96,0.08);
+    --accent-tint-faint: rgba(255,176,0,0.05);
+    --noise-opacity: 0;
+    --scanline-opacity: 0.4;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -64,6 +125,12 @@
     height: 100%;
   }
 
+  /* Термінал — моноширинний всюди, серіф витісняється */
+  [data-style="terminal"] body {
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+
   body {
     /* dynamic viewport - враховує адресну стрічку браузера */
     height: 100dvh;
@@ -71,6 +138,42 @@
     padding-bottom: env(safe-area-inset-bottom);
     display: flex;
     flex-direction: column;
+    position: relative;
+  }
+
+  /* Текстура паперу — SVG-шум через ::before. Тільки в стилі "paper".
+     В світлій темі шум темніший (multiply), в темній — світліший (screen). */
+  [data-style="paper"] body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: var(--noise-opacity);
+    mix-blend-mode: var(--noise-blend);
+    background-size: 200px 200px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.15  0 0 0 0 0.10  0 0 0 0 0.05  0 0 0 0.18 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  [data-style="paper"][data-mode="dark"] body::before {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.6  0 0 0 0 0.5  0 0 0 0 0.35  0 0 0 0.12 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* CRT-сканлайни — тільки в терміналі, ледь помітні */
+  [data-style="terminal"] body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: var(--scanline-opacity);
+    background: linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(0,0,0,0.18) 3px,
+      transparent 4px
+    );
+    background-size: 100% 4px;
   }
 
   button { font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; font-size: inherit; }
@@ -163,6 +266,10 @@
     transition: background 0.15s;
     min-height: 64px;
   }
+  /* Папір — пунктир як у зошитному щоденнику */
+  [data-style="paper"] .day-row {
+    border-bottom: 1px dashed var(--line);
+  }
   .day-row:active { background: var(--bg-elev); }
   .day-row.today { background: linear-gradient(90deg, var(--accent-tint-faint), transparent 60%); }
   .day-row.today .day-name { color: var(--accent); }
@@ -208,6 +315,10 @@
     align-items: center;
     gap: 4px;
   }
+  /* Папір — товстіша подвійна лінія, як у газеті */
+  [data-style="paper"] footer {
+    border-top: 2px solid var(--line);
+  }
   .footer-label {
     font-family: var(--mono);
     font-size: 11px;
@@ -223,6 +334,20 @@
     font-variant-numeric: tabular-nums;
     line-height: 1;
     letter-spacing: -0.5px;
+  }
+  /* Папір — opsz "розкриває" Fraunces на великих числах, теплі заокруглення */
+  [data-style="paper"] .footer-value {
+    font-weight: 400;
+    font-size: 48px;
+    font-variation-settings: "opsz" 144;
+    letter-spacing: -1px;
+  }
+  /* Термінал — моноширинний, не серіф */
+  [data-style="terminal"] .footer-value {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 32px;
+    letter-spacing: 0;
   }
 
   /* MODAL */
@@ -253,6 +378,13 @@
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
     animation: slideUp 0.25s ease;
+  }
+  /* Термінал — без скруглень, чіткі рамки */
+  [data-style="terminal"] .modal {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border: 1px solid var(--text);
+    border-bottom: none;
   }
 
   .modal-header {
@@ -754,6 +886,12 @@ const I18N = {
     worker: 'Працівник',
     enterName: 'Введіть імʼя',
     appearance: 'Вигляд',
+    stylePaper: 'Папір',
+    styleTerminal: 'Термінал',
+    paperLight: 'Світлий',
+    paperDark: 'Темний',
+    termGreen: 'Зелений',
+    termAmber: 'Янтарний',
     dark: 'Темна',
     light: 'Світла',
     language: 'Мова',
@@ -820,6 +958,12 @@ const I18N = {
     worker: 'Worker',
     enterName: 'Enter name',
     appearance: 'Appearance',
+    stylePaper: 'Paper',
+    styleTerminal: 'Terminal',
+    paperLight: 'Light',
+    paperDark: 'Dark',
+    termGreen: 'Green',
+    termAmber: 'Amber',
     dark: 'Dark',
     light: 'Light',
     language: 'Language',
@@ -866,8 +1010,11 @@ function pluralWeeks(n) {
 // ============ STATE ============
 let state = {
   workerName: '',
-  theme: 'dark', // 'dark' | 'light'
-  lang: 'uk',    // 'uk' | 'en'
+  // Стиль і режими — кожен стиль памʼятає свою варіацію незалежно
+  style: 'paper',         // 'paper' | 'terminal'
+  paperMode: 'light',     // 'light' | 'dark'  (для папір)
+  termMode: 'green',      // 'green' | 'amber' (для термінал)
+  lang: 'uk',             // 'uk' | 'en'
   days: {} // { 'YYYY-MM-DD': { start: '08:00', end: '17:00', breakMin: 0, dayOff: false } }
 };
 let currentMonday = mondayOf(new Date());
@@ -882,8 +1029,17 @@ function load() {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
         state.workerName = parsed.workerName || '';
-        state.theme = (parsed.theme === 'light' || parsed.theme === 'dark') ? parsed.theme : 'dark';
+        state.lang = (parsed.lang === 'en' || parsed.lang === 'uk') ? parsed.lang : 'uk';
         state.days = parsed.days || {};
+        // Стиль і режими
+        state.style = (parsed.style === 'terminal' || parsed.style === 'paper') ? parsed.style : 'paper';
+        state.paperMode = (parsed.paperMode === 'dark' || parsed.paperMode === 'light') ? parsed.paperMode : 'light';
+        state.termMode  = (parsed.termMode === 'amber' || parsed.termMode === 'green') ? parsed.termMode : 'green';
+        // Міграція зі старої схеми (state.theme: 'dark'/'light') —
+        // якщо стилю не було збережено, мапимо темну на папір-темну, світлу залишаємо як дефолт.
+        if (!parsed.style && parsed.theme === 'dark') {
+          state.paperMode = 'dark';
+        }
       }
     }
   } catch (e) {
@@ -1377,9 +1533,18 @@ function openSettings() {
 
         <div class="settings-section">
           <h3>${t('appearance')}</h3>
+          <div class="seg" style="margin-bottom: 8px;">
+            <button id="stylePaper" class="${state.style === 'paper' ? 'active' : ''}">${t('stylePaper')}</button>
+            <button id="styleTerminal" class="${state.style === 'terminal' ? 'active' : ''}">${t('styleTerminal')}</button>
+          </div>
           <div class="seg" style="margin-bottom: 0;">
-            <button id="themeDark" class="${state.theme === 'dark' ? 'active' : ''}">${t('dark')}</button>
-            <button id="themeLight" class="${state.theme === 'light' ? 'active' : ''}">${t('light')}</button>
+            ${state.style === 'paper' ? `
+              <button id="modeA" class="${state.paperMode === 'light' ? 'active' : ''}">${t('paperLight')}</button>
+              <button id="modeB" class="${state.paperMode === 'dark' ? 'active' : ''}">${t('paperDark')}</button>
+            ` : `
+              <button id="modeA" class="${state.termMode === 'green' ? 'active' : ''}">${t('termGreen')}</button>
+              <button id="modeB" class="${state.termMode === 'amber' ? 'active' : ''}">${t('termAmber')}</button>
+            `}
           </div>
         </div>
 
@@ -1429,17 +1594,35 @@ function openSettings() {
       render();
     }
   });
-  document.getElementById('themeDark').addEventListener('click', () => setTheme('dark'));
-  document.getElementById('themeLight').addEventListener('click', () => setTheme('light'));
+  document.getElementById('stylePaper').addEventListener('click', () => setStyle('paper'));
+  document.getElementById('styleTerminal').addEventListener('click', () => setStyle('terminal'));
+  document.getElementById('modeA').addEventListener('click', () => setMode('A'));
+  document.getElementById('modeB').addEventListener('click', () => setMode('B'));
   document.getElementById('langUk').addEventListener('click', () => setLang('uk'));
   document.getElementById('langEn').addEventListener('click', () => setLang('en'));
 
-  function setTheme(theme) {
-    state.theme = theme;
+  function setStyle(style) {
+    state.style = style;
     save();
-    applyTheme(theme);
-    document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
-    document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+    applyStyle();
+    // Перерендеримо модалку, бо суб-перемикач (варіація) міняється
+    saveName();
+    closeModal();
+    render();
+    openSettings();
+  }
+
+  function setMode(slot) {
+    // slot 'A' = перша кнопка (light/green), 'B' = друга (dark/amber)
+    if (state.style === 'paper') {
+      state.paperMode = slot === 'A' ? 'light' : 'dark';
+    } else {
+      state.termMode = slot === 'A' ? 'green' : 'amber';
+    }
+    save();
+    applyStyle();
+    document.getElementById('modeA').classList.toggle('active', slot === 'A');
+    document.getElementById('modeB').classList.toggle('active', slot === 'B');
   }
 
   function setLang(lang) {
@@ -1815,14 +1998,30 @@ document.getElementById('datePicker').addEventListener('change', (e) => {
 });
 document.getElementById('settingsBtn').addEventListener('click', openSettings);
 
-// ============ THEME ============
-// Застосовує тему: data-theme атрибут на <html> + оновлює meta theme-color
-// (theme-color визначає колір системної смужки в Android Chrome PWA)
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
+// ============ STYLE / MODE ============
+// Застосовує стиль і його варіацію: ставить data-style + data-mode на <html>,
+// оновлює meta theme-color (колір системної смужки в Android Chrome PWA).
+function applyStyle() {
+  const html = document.documentElement;
+  html.setAttribute('data-style', state.style);
+  if (state.style === 'paper') {
+    html.setAttribute('data-mode', state.paperMode);
+  } else {
+    html.setAttribute('data-mode', state.termMode);
+  }
   const meta = document.getElementById('metaThemeColor');
   if (meta) {
-    meta.setAttribute('content', theme === 'light' ? '#f7f3eb' : '#0a0a0a');
+    // theme-color = bg поточної комбінації
+    const colors = {
+      'paper-light': '#ede0c4',
+      'paper-dark':  '#1c1610',
+      'terminal-green': '#0a0e0a',
+      'terminal-amber': '#0e0a05'
+    };
+    const key = state.style === 'paper'
+      ? `paper-${state.paperMode}`
+      : `terminal-${state.termMode}`;
+    meta.setAttribute('content', colors[key] || '#ede0c4');
   }
 }
 
@@ -1845,7 +2044,7 @@ if ('serviceWorker' in navigator) {
 
 // ============ INIT ============
 load();
-applyTheme(state.theme);
+applyStyle();
 applyLang(state.lang);
 render();
 </script>
