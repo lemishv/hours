@@ -568,6 +568,43 @@
   }
   .export-btn .arrow { color: var(--accent); font-size: 18px; }
 
+  /* JOB LIST (вибір активної роботи) */
+  .job-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .job-item {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--bg-elev-2);
+    border-radius: 10px;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text);
+    font-family: var(--serif);
+    font-size: 16px;
+    transition: background 0.15s;
+  }
+  .job-item:active { background: var(--border); }
+  .job-item.active {
+    background: var(--accent-tint);
+    border-left: 3px solid var(--accent);
+    padding-left: 11px;
+  }
+  .job-marker { color: var(--accent); font-size: 14px; }
+  .job-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job-count {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+
   /* HIDDEN UTILITY */
   .hidden { display: none !important; }
   .sr-only {
@@ -885,6 +922,20 @@ const I18N = {
     allWeeks: 'усі тижні',
     worker: 'Працівник',
     enterName: 'Введіть імʼя',
+    job: 'Робота',
+    jobName: 'Назва роботи',
+    jobNamePlaceholder: 'Назва (для звітів)',
+    jobUnnamed: 'без назви',
+    addJob: 'Додати роботу',
+    deleteJob: 'Видалити цю роботу',
+    deleteJobConfirm: 'Видалити роботу і всі її записи? Ця дія незворотна.',
+    deleteJobConfirm2: 'Точно видалити?',
+    backup: 'Резервна копія',
+    exportData: 'Експорт даних',
+    importData: 'Імпорт даних',
+    importConfirm: 'Імпортувати дані з файлу? Усі поточні записи будуть замінені.',
+    importOk: 'Дані успішно імпортовано.',
+    importError: 'Не вдалося прочитати файл. Перевір що це правильний файл резервної копії.',
     appearance: 'Вигляд',
     stylePaper: 'Папір',
     styleTerminal: 'Термінал',
@@ -898,6 +949,7 @@ const I18N = {
     data: 'Дані',
     deleteAll: 'Видалити всі записи',
     deleteAllConfirm: 'Видалити всі записи назавжди? Ця дія незворотна.',
+    deleteAllConfirm2: 'Точно видалити всі записи?',
     done: 'Готово',
     hours: 'год',
     // PDF
@@ -957,6 +1009,20 @@ const I18N = {
     allWeeks: 'all weeks',
     worker: 'Worker',
     enterName: 'Enter name',
+    job: 'Job',
+    jobName: 'Job name',
+    jobNamePlaceholder: 'Name (for reports)',
+    jobUnnamed: 'unnamed',
+    addJob: 'Add job',
+    deleteJob: 'Delete this job',
+    deleteJobConfirm: 'Delete this job and all its entries? This cannot be undone.',
+    deleteJobConfirm2: 'Tap again to confirm',
+    backup: 'Backup',
+    exportData: 'Export data',
+    importData: 'Import data',
+    importConfirm: 'Import data from file? All current entries will be replaced.',
+    importOk: 'Data imported successfully.',
+    importError: 'Could not read the file. Check that it is a valid backup file.',
     appearance: 'Appearance',
     stylePaper: 'Paper',
     styleTerminal: 'Terminal',
@@ -970,6 +1036,7 @@ const I18N = {
     data: 'Data',
     deleteAll: 'Delete all entries',
     deleteAllConfirm: 'Delete all entries permanently? This action cannot be undone.',
+    deleteAllConfirm2: 'Tap again to delete all entries',
     done: 'Done',
     hours: 'h',
     pdfTitle: 'Hours',
@@ -1009,17 +1076,34 @@ function pluralWeeks(n) {
 
 // ============ STATE ============
 let state = {
-  workerName: '',
+  // Список робіт. Кожна робота — окремий запис з власними днями.
+  workers: {},          // { 'w_1': { name: 'Робота 1', days: {...} }, ... }
+  activeWorkerId: null, // ID активної роботи
+
   // Стиль і режими — кожен стиль памʼятає свою варіацію незалежно
-  style: 'paper',         // 'paper' | 'terminal'
-  paperMode: 'light',     // 'light' | 'dark'  (для папір)
-  termMode: 'green',      // 'green' | 'amber' (для термінал)
-  lang: 'uk',             // 'uk' | 'en'
-  days: {} // { 'YYYY-MM-DD': { start: '08:00', end: '17:00', breakMin: 0, dayOff: false } }
+  style: 'paper',       // 'paper' | 'terminal'
+  paperMode: 'light',   // 'light' | 'dark'  (для папір)
+  termMode: 'green',    // 'green' | 'amber' (для термінал)
+  lang: 'uk'            // 'uk' | 'en'
 };
 let currentMonday = mondayOf(new Date());
 let editingDate = null;
 let editDraft = null;
+
+// ============ WORKERS HELPERS ============
+// Повертає активну роботу. Гарантовано існує (load() створює одну при старті).
+function getActiveWorker() {
+  return state.workers[state.activeWorkerId];
+}
+// Записи днів активної роботи. { 'YYYY-MM-DD': { start, end, breakMin, dayOff } }
+function getActiveDays() {
+  const w = getActiveWorker();
+  return w ? w.days : {};
+}
+// Згенерувати унікальний ID для нової роботи
+function genWorkerId() {
+  return 'w_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+}
 
 // ============ STORAGE ============
 function load() {
@@ -1028,22 +1112,39 @@ function load() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        state.workerName = parsed.workerName || '';
+        // Налаштування інтерфейсу
         state.lang = (parsed.lang === 'en' || parsed.lang === 'uk') ? parsed.lang : 'uk';
-        state.days = parsed.days || {};
-        // Стиль і режими
         state.style = (parsed.style === 'terminal' || parsed.style === 'paper') ? parsed.style : 'paper';
         state.paperMode = (parsed.paperMode === 'dark' || parsed.paperMode === 'light') ? parsed.paperMode : 'light';
         state.termMode  = (parsed.termMode === 'amber' || parsed.termMode === 'green') ? parsed.termMode : 'green';
-        // Міграція зі старої схеми (state.theme: 'dark'/'light') —
-        // якщо стилю не було збережено, мапимо темну на папір-темну, світлу залишаємо як дефолт.
-        if (!parsed.style && parsed.theme === 'dark') {
-          state.paperMode = 'dark';
+        // Міграція стилю: якщо стилю не було, але старе theme === 'dark'
+        if (!parsed.style && parsed.theme === 'dark') state.paperMode = 'dark';
+
+        // Робочі дані: нова схема (workers) або стара (workerName + days)
+        if (parsed.workers && typeof parsed.workers === 'object' && parsed.activeWorkerId) {
+          state.workers = parsed.workers;
+          state.activeWorkerId = parsed.activeWorkerId;
+        } else if (parsed.workerName !== undefined || parsed.days) {
+          // Міграція зі старої схеми: створюємо одну роботу з наявним іменем і днями
+          const id = genWorkerId();
+          state.workers = {
+            [id]: {
+              name: parsed.workerName || '',
+              days: parsed.days || {}
+            }
+          };
+          state.activeWorkerId = id;
         }
       }
     }
   } catch (e) {
     console.warn('Load failed', e);
+  }
+  // Якщо нічого не завантажено — створюємо першу порожню роботу
+  if (!state.activeWorkerId || !state.workers[state.activeWorkerId]) {
+    const id = genWorkerId();
+    state.workers = { [id]: { name: '', days: {} } };
+    state.activeWorkerId = id;
   }
 }
 
@@ -1146,7 +1247,7 @@ function fmtHours(h) {
 function weekTotal(monday) {
   let sum = 0;
   for (const d of weekDates(monday)) {
-    const day = state.days[isoDate(d)];
+    const day = getActiveDays()[isoDate(d)];
     const h = calcDurationHours(day);
     if (h != null) sum += h;
   }
@@ -1157,7 +1258,7 @@ function totalUpToWeek(monday) {
   // сума всіх записів, де дата ≤ неділі цього тижня
   const sundayIso = isoDate(addDays(monday, 6));
   let sum = 0;
-  for (const [iso, day] of Object.entries(state.days)) {
+  for (const [iso, day] of Object.entries(getActiveDays())) {
     if (iso > sundayIso) continue;
     const h = calcDurationHours(day);
     if (h != null) sum += h;
@@ -1189,7 +1290,7 @@ function renderHeader() {
 function computeWeekLabel() {
   // Якщо є записи — нумеруємо тижні від тижня першого запису.
   // Інакше — порожній текст.
-  const dates = Object.keys(state.days).sort();
+  const dates = Object.keys(getActiveDays()).sort();
   if (dates.length === 0) return '';
   const firstIso = dates[0];
   const firstMonday = mondayOf(new Date(firstIso));
@@ -1205,7 +1306,7 @@ function renderDays() {
   const today = new Date();
   for (const date of weekDates(currentMonday)) {
     const iso = isoDate(date);
-    const day = state.days[iso];
+    const day = getActiveDays()[iso];
     const row = document.createElement('button');
     row.className = 'day-row' + (sameDay(date, today) ? ' today' : '');
     row.dataset.iso = iso;
@@ -1258,7 +1359,7 @@ function renderTotals() {
 // ============ DAY EDITOR ============
 function openDayEditor(iso) {
   editingDate = iso;
-  const existing = state.days[iso];
+  const existing = getActiveDays()[iso];
   editDraft = existing
     ? { ...existing }
     : { start: '08:00', end: '17:00', breakMin: 0, dayOff: false };
@@ -1326,7 +1427,7 @@ function renderDayEditor() {
           <button class="btn btn-primary" id="saveBtn">${t('save')}</button>
         </div>
 
-        ${state.days[editingDate] ? `
+        ${getActiveDays()[editingDate] ? `
           <button class="btn btn-danger" id="deleteBtn">${t('clearEntry')}</button>
         ` : ''}
       </div>
@@ -1385,7 +1486,7 @@ function renderDayEditor() {
     updateDurationPreview();
   }
 
-  if (state.days[editingDate]) {
+  if (getActiveDays()[editingDate]) {
     document.getElementById('deleteBtn').addEventListener('click', deleteDayEdit);
   }
 }
@@ -1428,7 +1529,7 @@ function updateDurationPreview() {
 
 function saveDayEdit() {
   if (editDraft.dayOff) {
-    state.days[editingDate] = { dayOff: true };
+    getActiveWorker().days[editingDate] = { dayOff: true };
   } else {
     const h = calcDurationHours(editDraft);
     if (h == null) {
@@ -1440,7 +1541,7 @@ function saveDayEdit() {
       }
       return;
     }
-    state.days[editingDate] = {
+    getActiveWorker().days[editingDate] = {
       start: editDraft.start,
       end: editDraft.end,
       breakMin: editDraft.breakMin || 0,
@@ -1455,7 +1556,7 @@ function saveDayEdit() {
 
 function deleteDayEdit() {
   if (!confirm(t('clearEntryConfirm'))) return;
-  delete state.days[editingDate];
+  delete getActiveWorker().days[editingDate];
   save();
   vibrate(20);
   closeModal();
@@ -1527,8 +1628,43 @@ function openSettings() {
         </div>
 
         <div class="settings-section">
-          <h3>${t('worker')}</h3>
-          <input type="text" id="nameInput" value="${escapeHtml(state.workerName)}" placeholder="${t('enterName')}">
+          <h3>${t('job')}</h3>
+          <div class="job-list">
+            ${Object.entries(state.workers).map(([id, w]) => `
+              <button class="job-item ${id === state.activeWorkerId ? 'active' : ''}" data-job-id="${id}">
+                <span class="job-marker">${id === state.activeWorkerId ? '●' : '○'}</span>
+                <span class="job-name">${escapeHtml(w.name) || `<em style="color: var(--text-faint);">${t('jobUnnamed')}</em>`}</span>
+                <span class="job-count">${Object.keys(w.days).length} ${state.lang === 'en' ? 'd' : 'дн'}</span>
+              </button>
+            `).join('')}
+          </div>
+          <button class="export-btn" id="addJob" style="margin-top: 8px;">
+            <span class="label">+ ${t('addJob')}</span>
+            <span class="arrow">→</span>
+          </button>
+          <div style="margin-top: 14px;">
+            <label class="field-label" style="display: block; margin-bottom: 6px;">${t('jobName')}</label>
+            <input type="text" id="nameInput" value="${escapeHtml(getActiveWorker().name)}" placeholder="${t('jobNamePlaceholder')}">
+          </div>
+          ${Object.keys(state.workers).length > 1 ? `
+            <button class="export-btn" id="deleteJob" style="margin-top: 10px; color: var(--danger);">
+              <span class="label" style="color: var(--danger);">${t('deleteJob')}</span>
+              <span class="arrow" style="color: var(--danger);">×</span>
+            </button>
+          ` : ''}
+        </div>
+
+        <div class="settings-section">
+          <h3>${t('backup')}</h3>
+          <button class="export-btn" id="exportData">
+            <span class="label">${t('exportData')}</span>
+            <span class="arrow">→</span>
+          </button>
+          <button class="export-btn" id="importData">
+            <span class="label">${t('importData')}</span>
+            <span class="arrow">←</span>
+          </button>
+          <input type="file" id="importFile" accept=".json,application/json" style="display: none;">
         </div>
 
         <div class="settings-section">
@@ -1586,20 +1722,118 @@ function openSettings() {
       exportPdf({ type: 'all' });
     });
   }
-  document.getElementById('clearAll').addEventListener('click', () => {
-    if (confirm(t('deleteAllConfirm'))) {
-      state.days = {};
+  const clearAllBtn = document.getElementById('clearAll');
+  {
+    let armed = false;
+    let armTimer = null;
+    const labelEl = clearAllBtn.querySelector('.label');
+    const arrowEl = clearAllBtn.querySelector('.arrow');
+    const origLabel = labelEl.textContent;
+    const origArrow = arrowEl.textContent;
+    function disarm() {
+      armed = false;
+      if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      labelEl.textContent = origLabel;
+      arrowEl.textContent = origArrow;
+      clearAllBtn.style.background = '';
+    }
+    clearAllBtn.addEventListener('click', () => {
+      if (!armed) {
+        armed = true;
+        labelEl.textContent = t('deleteAllConfirm2');
+        arrowEl.textContent = '×';
+        clearAllBtn.style.background = 'var(--accent-tint)';
+        armTimer = setTimeout(disarm, 4000);
+        return;
+      }
+      getActiveWorker().days = {};
       save();
       closeModal();
       render();
-    }
-  });
+    });
+  }
   document.getElementById('stylePaper').addEventListener('click', () => setStyle('paper'));
   document.getElementById('styleTerminal').addEventListener('click', () => setStyle('terminal'));
   document.getElementById('modeA').addEventListener('click', () => setMode('A'));
   document.getElementById('modeB').addEventListener('click', () => setMode('B'));
   document.getElementById('langUk').addEventListener('click', () => setLang('uk'));
   document.getElementById('langEn').addEventListener('click', () => setLang('en'));
+
+  // ----- ЖОБИ: вибір активної, додавання, видалення -----
+  document.querySelectorAll('.job-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-job-id');
+      if (id && id !== state.activeWorkerId && state.workers[id]) {
+        // Перед перемиканням збережемо поточне імʼя в полі (на випадок якщо редагували)
+        saveName();
+        state.activeWorkerId = id;
+        save();
+        // Перерендеримо модалку щоб список оновився
+        closeModal();
+        render();
+        openSettings();
+      }
+    });
+  });
+  document.getElementById('addJob').addEventListener('click', () => {
+    saveName();
+    const id = genWorkerId();
+    state.workers[id] = { name: '', days: {} };
+    state.activeWorkerId = id;
+    save();
+    closeModal();
+    render();
+    openSettings();
+  });
+  const delJobBtn = document.getElementById('deleteJob');
+  if (delJobBtn) {
+    let armed = false;
+    let armTimer = null;
+    const labelEl = delJobBtn.querySelector('.label');
+    const arrowEl = delJobBtn.querySelector('.arrow');
+    const origLabel = labelEl.textContent;
+    const origArrow = arrowEl.textContent;
+    function disarm() {
+      armed = false;
+      if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      labelEl.textContent = origLabel;
+      arrowEl.textContent = origArrow;
+      delJobBtn.style.background = '';
+    }
+    delJobBtn.addEventListener('click', () => {
+      if (Object.keys(state.workers).length <= 1) return;
+      if (!armed) {
+        // Перший клік — попередження
+        armed = true;
+        labelEl.textContent = t('deleteJobConfirm2');
+        arrowEl.textContent = '×';
+        delJobBtn.style.background = 'var(--accent-tint)';
+        armTimer = setTimeout(disarm, 4000); // авто-скидання через 4 сек
+        return;
+      }
+      // Другий клік — справжнє видалення
+      delete state.workers[state.activeWorkerId];
+      state.activeWorkerId = Object.keys(state.workers)[0];
+      save();
+      closeModal();
+      render();
+      openSettings();
+    });
+  }
+
+  // ----- РЕЗЕРВНА КОПІЯ: експорт у файл, імпорт з файлу -----
+  document.getElementById('exportData').addEventListener('click', () => {
+    saveName();
+    exportBackup();
+  });
+  document.getElementById('importData').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0];
+    if (file) importBackup(file);
+    e.target.value = ''; // скидаємо щоб можна було імпортувати той самий файл повторно
+  });
 
   function setStyle(style) {
     state.style = style;
@@ -1637,7 +1871,7 @@ function openSettings() {
   }
 
   function saveName() {
-    state.workerName = document.getElementById('nameInput').value.trim();
+    getActiveWorker().name = document.getElementById('nameInput').value.trim();
     save();
   }
 
@@ -1649,12 +1883,12 @@ function openSettings() {
 
 // Загальна статистика по всіх записах
 function computeStats() {
-  const dates = Object.keys(state.days).sort();
+  const dates = Object.keys(getActiveDays()).sort();
   let totalHours = 0;
   let workDays = 0;
   const weekKeys = new Set();
   for (const iso of dates) {
-    const day = state.days[iso];
+    const day = getActiveDays()[iso];
     const h = calcDurationHours(day);
     if (h != null) {
       totalHours += h;
@@ -1685,7 +1919,7 @@ function escapeHtml(s) {
 function runningTotalBeforeWeek(monday) {
   const mondayIso = isoDate(monday);
   let sum = 0;
-  for (const [iso, day] of Object.entries(state.days)) {
+  for (const [iso, day] of Object.entries(getActiveDays())) {
     if (iso >= mondayIso) continue;
     const h = calcDurationHours(day);
     if (h != null) sum += h;
@@ -1697,7 +1931,7 @@ function runningTotalBeforeWeek(monday) {
 // Будує HTML-звіт у #printArea і повертає метадані для імені файлу.
 // scope: { type: 'week', monday } або { type: 'all' }
 function buildReportHtml(scope) {
-  const dates = Object.keys(state.days).sort();
+  const dates = Object.keys(getActiveDays()).sort();
   if (dates.length === 0) return null;
 
   let firstMonday, lastMonday, periodStart, periodEnd, titleSuffix;
@@ -1732,7 +1966,7 @@ function buildReportHtml(scope) {
 
     for (const d of weekDates(monday)) {
       const iso = isoDate(d);
-      const day = state.days[iso];
+      const day = getActiveDays()[iso];
       const dayShort = DAY_NAMES_SHORT[state.lang][d.getDay()];
 
       if (!day) {
@@ -1824,7 +2058,7 @@ function buildReportHtml(scope) {
 
   if (scope.type === 'week' && !hasAnyContent) return null;
 
-  const workerName = state.workerName || t('pdfNoName');
+  const workerName = getActiveWorker().name || t('pdfNoName');
 
   // Великий центральний підсумок — лише для повного звіту.
   // У тижневому він дублює "Підсумок тижня" в tfoot, тому пропускаємо.
@@ -1857,7 +2091,7 @@ function buildReportHtml(scope) {
 }
 
 function weekIndexOf(monday) {
-  const dates = Object.keys(state.days).sort();
+  const dates = Object.keys(getActiveDays()).sort();
   if (dates.length === 0) return 1;
   const firstMonday = mondayOf(new Date(dates[0]));
   const diffDays = Math.round((monday - firstMonday) / 86400000);
@@ -1939,7 +2173,7 @@ async function exportPdf(scope) {
         await navigator.share({
           files: [file],
           title: t('pdfShareTitle'),
-          text: state.workerName ? `${t('pdfShareReport')}: ${state.workerName}` : t('pdfShareReport')
+          text: getActiveWorker().name ? `${t('pdfShareReport')}: ${getActiveWorker().name}` : t('pdfShareReport')
         });
         vibrate([10, 30, 10]);
       } catch (err) {
@@ -1997,6 +2231,78 @@ document.getElementById('datePicker').addEventListener('change', (e) => {
   }
 });
 document.getElementById('settingsBtn').addEventListener('click', openSettings);
+
+// ============ BACKUP (експорт/імпорт даних) ============
+// Зберігає весь state у JSON-файл і дає його завантажити.
+// Файл містить усі роботи, дні і налаштування — повна копія.
+function exportBackup() {
+  try {
+    const payload = {
+      // Версія схеми — щоб у майбутньому вміти читати старі бекапи
+      schema: 1,
+      exportedAt: new Date().toISOString(),
+      data: state
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = isoDate(new Date());
+    a.href = url;
+    a.download = `години-резервна-копія-${today}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn('Export failed', e);
+    alert(t('importError')); // спільне повідомлення про помилку файлу
+  }
+}
+
+// Читає файл, валідує, заміщує state.
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = e.target.result;
+      const parsed = JSON.parse(text);
+      // Валідація: має бути обʼєкт з полем data, всередині — workers і activeWorkerId
+      const data = parsed.data || parsed; // допускаємо і "сирий" state без обгортки
+      if (!data || typeof data !== 'object' || !data.workers || !data.activeWorkerId
+          || typeof data.workers !== 'object' || !data.workers[data.activeWorkerId]) {
+        throw new Error('Invalid backup');
+      }
+      if (!confirm(t('importConfirm'))) return;
+      // Замінюємо стан повністю, але зберігаємо мову/стиль поточні (бо це налаштування пристрою)
+      const keepLang = state.lang;
+      const keepStyle = state.style;
+      const keepPaper = state.paperMode;
+      const keepTerm  = state.termMode;
+      state.workers = data.workers;
+      state.activeWorkerId = data.activeWorkerId;
+      // Якщо в бекапі є мова/стиль — беремо з нього (бо це теж важливо)
+      if (data.lang) state.lang = data.lang;
+      else state.lang = keepLang;
+      if (data.style) state.style = data.style;
+      else state.style = keepStyle;
+      if (data.paperMode) state.paperMode = data.paperMode;
+      else state.paperMode = keepPaper;
+      if (data.termMode) state.termMode = data.termMode;
+      else state.termMode = keepTerm;
+      save();
+      applyStyle();
+      applyLang(state.lang);
+      closeModal();
+      render();
+      alert(t('importOk'));
+    } catch (err) {
+      console.warn('Import failed', err);
+      alert(t('importError'));
+    }
+  };
+  reader.onerror = () => alert(t('importError'));
+  reader.readAsText(file);
+}
 
 // ============ STYLE / MODE ============
 // Застосовує стиль і його варіацію: ставить data-style + data-mode на <html>,
