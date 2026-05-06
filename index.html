@@ -568,7 +568,7 @@
   }
   .export-btn .arrow { color: var(--accent); font-size: 18px; }
 
-  /* JOB LIST (вибір активної роботи) */
+  /* JOB LIST (вибір активного працівника) */
   .job-list {
     display: flex;
     flex-direction: column;
@@ -834,14 +834,14 @@
 <body>
 
 <header>
-  <button class="nav-btn" id="prevWeek">‹</button>
-  <button class="week-title" id="weekTitle">
+  <button class="nav-btn" id="prevWeek" aria-label="Попередній тиждень">‹</button>
+  <button class="week-title" id="weekTitle" aria-label="Вибрати дату">
     <div class="week-range" id="weekRange">—</div>
     <div class="week-num" id="weekNum"></div>
-    <input type="date" id="datePicker" class="date-overlay">
+    <input type="date" id="datePicker" class="date-overlay" aria-label="Вибрати дату">
   </button>
-  <button class="nav-btn" id="nextWeek">›</button>
-  <button class="nav-btn" id="settingsBtn">⚙</button>
+  <button class="nav-btn" id="nextWeek" aria-label="Наступний тиждень">›</button>
+  <button class="nav-btn" id="settingsBtn" aria-label="Налаштування">⚙</button>
 </header>
 
 <main id="daysContainer"></main>
@@ -921,15 +921,15 @@ const I18N = {
     fullReport: 'Повний звіт',
     allWeeks: 'усі тижні',
     worker: 'Працівник',
-    enterName: 'Введіть імʼя',
-    job: 'Робота',
-    jobName: 'Назва роботи',
-    jobNamePlaceholder: 'Назва (для звітів)',
-    jobUnnamed: 'без назви',
-    addJob: 'Додати роботу',
-    deleteJob: 'Видалити цю роботу',
-    deleteJobConfirm: 'Видалити роботу і всі її записи? Ця дія незворотна.',
-    deleteJobConfirm2: 'Точно видалити?',
+    workerName: 'Імʼя',
+    workerNamePlaceholder: 'Імʼя (для звітів)',
+    workerUnnamed: 'без імені',
+    addWorker: 'Додати працівника',
+    deleteWorker: 'Видалити цього працівника',
+    deleteWorkerConfirm2: 'Точно видалити?',
+    workerEditorTitle: 'Працівник',
+    newWorkerTitle: 'Новий працівник',
+    create: 'Створити',
     backup: 'Резервна копія',
     exportData: 'Експорт даних',
     importData: 'Імпорт даних',
@@ -943,14 +943,10 @@ const I18N = {
     paperDark: 'Темний',
     termGreen: 'Зелений',
     termAmber: 'Янтарний',
-    dark: 'Темна',
-    light: 'Світла',
     language: 'Мова',
     data: 'Дані',
     deleteAll: 'Видалити всі записи',
-    deleteAllConfirm: 'Видалити всі записи назавжди? Ця дія незворотна.',
     deleteAllConfirm2: 'Точно видалити всі записи?',
-    done: 'Готово',
     hours: 'год',
     // PDF
     pdfTitle: 'Години',
@@ -958,7 +954,6 @@ const I18N = {
     pdfDate: 'Дата',
     pdfStart: 'Старт',
     pdfFinish: 'Фініш',
-    pdfBreak: 'Перерва',
     pdfDuration: 'Тривалість',
     pdfWeekSummary: 'Підсумок тижня',
     pdfRunningTotal: 'Накопичено від початку',
@@ -1008,15 +1003,15 @@ const I18N = {
     fullReport: 'Full report',
     allWeeks: 'all weeks',
     worker: 'Worker',
-    enterName: 'Enter name',
-    job: 'Job',
-    jobName: 'Job name',
-    jobNamePlaceholder: 'Name (for reports)',
-    jobUnnamed: 'unnamed',
-    addJob: 'Add job',
-    deleteJob: 'Delete this job',
-    deleteJobConfirm: 'Delete this job and all its entries? This cannot be undone.',
-    deleteJobConfirm2: 'Tap again to confirm',
+    workerName: 'Name',
+    workerNamePlaceholder: 'Name (for reports)',
+    workerUnnamed: 'unnamed',
+    addWorker: 'Add worker',
+    deleteWorker: 'Delete this worker',
+    deleteWorkerConfirm2: 'Tap again to confirm',
+    workerEditorTitle: 'Worker',
+    newWorkerTitle: 'New worker',
+    create: 'Create',
     backup: 'Backup',
     exportData: 'Export data',
     importData: 'Import data',
@@ -1030,21 +1025,16 @@ const I18N = {
     paperDark: 'Dark',
     termGreen: 'Green',
     termAmber: 'Amber',
-    dark: 'Dark',
-    light: 'Light',
     language: 'Language',
     data: 'Data',
     deleteAll: 'Delete all entries',
-    deleteAllConfirm: 'Delete all entries permanently? This action cannot be undone.',
     deleteAllConfirm2: 'Tap again to delete all entries',
-    done: 'Done',
     hours: 'h',
     pdfTitle: 'Hours',
     pdfDay: 'Day',
     pdfDate: 'Date',
     pdfStart: 'Start',
     pdfFinish: 'Finish',
-    pdfBreak: 'Break',
     pdfDuration: 'Duration',
     pdfWeekSummary: 'Week total',
     pdfRunningTotal: 'Running total',
@@ -1076,13 +1066,15 @@ function pluralWeeks(n) {
 
 // ============ STATE ============
 let state = {
-  // Список робіт. Кожна робота — окремий запис з власними днями.
-  workers: {},          // { 'w_1': { name: 'Робота 1', days: {...} }, ... }
-  activeWorkerId: null, // ID активної роботи
+  // Список працівників. Кожен працівник — окремий запис з власними днями.
+  workers: {},          // { 'w_1': { name: 'Іван', days: {...} }, ... }
+  activeWorkerId: null, // ID активного працівника
 
-  // Стиль і режими — кожен стиль памʼятає свою варіацію незалежно
+  // Стиль і режими — кожен стиль памʼятає свою варіацію незалежно.
+  // paperMode === null означає "слідувати системній темі" (prefers-color-scheme).
+  // Як тільки користувач натискає на кнопку Світла/Темна — фіксується явне значення.
   style: 'paper',       // 'paper' | 'terminal'
-  paperMode: 'light',   // 'light' | 'dark'  (для папір)
+  paperMode: null,      // null (auto) | 'light' | 'dark'
   termMode: 'green',    // 'green' | 'amber' (для термінал)
   lang: 'uk'            // 'uk' | 'en'
 };
@@ -1091,16 +1083,16 @@ let editingDate = null;
 let editDraft = null;
 
 // ============ WORKERS HELPERS ============
-// Повертає активну роботу. Гарантовано існує (load() створює одну при старті).
+// Повертає активного працівника. Гарантовано існує (load() створює одного при старті).
 function getActiveWorker() {
   return state.workers[state.activeWorkerId];
 }
-// Записи днів активної роботи. { 'YYYY-MM-DD': { start, end, breakMin, dayOff } }
+// Записи днів активного працівника. { 'YYYY-MM-DD': { start, end, breakMin, dayOff } }
 function getActiveDays() {
   const w = getActiveWorker();
   return w ? w.days : {};
 }
-// Згенерувати унікальний ID для нової роботи
+// Згенерувати унікальний ID для нового працівника
 function genWorkerId() {
   return 'w_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 }
@@ -1115,7 +1107,9 @@ function load() {
         // Налаштування інтерфейсу
         state.lang = (parsed.lang === 'en' || parsed.lang === 'uk') ? parsed.lang : 'uk';
         state.style = (parsed.style === 'terminal' || parsed.style === 'paper') ? parsed.style : 'paper';
-        state.paperMode = (parsed.paperMode === 'dark' || parsed.paperMode === 'light') ? parsed.paperMode : 'light';
+        // paperMode може бути null (auto — слідує системі), 'light' або 'dark'.
+        // Якщо в файлі його нема або значення неочікуване — auto.
+        state.paperMode = (parsed.paperMode === 'dark' || parsed.paperMode === 'light') ? parsed.paperMode : null;
         state.termMode  = (parsed.termMode === 'amber' || parsed.termMode === 'green') ? parsed.termMode : 'green';
         // Міграція стилю: якщо стилю не було, але старе theme === 'dark'
         if (!parsed.style && parsed.theme === 'dark') state.paperMode = 'dark';
@@ -1125,7 +1119,7 @@ function load() {
           state.workers = parsed.workers;
           state.activeWorkerId = parsed.activeWorkerId;
         } else if (parsed.workerName !== undefined || parsed.days) {
-          // Міграція зі старої схеми: створюємо одну роботу з наявним іменем і днями
+          // Міграція зі старої схеми: створюємо одного працівника з наявним іменем і днями
           const id = genWorkerId();
           state.workers = {
             [id]: {
@@ -1140,7 +1134,7 @@ function load() {
   } catch (e) {
     console.warn('Load failed', e);
   }
-  // Якщо нічого не завантажено — створюємо першу порожню роботу
+  // Якщо нічого не завантажено — створюємо першого порожнього працівника
   if (!state.activeWorkerId || !state.workers[state.activeWorkerId]) {
     const id = genWorkerId();
     state.workers = { [id]: { name: '', days: {} } };
@@ -1533,12 +1527,9 @@ function saveDayEdit() {
   } else {
     const h = calcDurationHours(editDraft);
     if (h == null) {
+      // Невалідні дані — превʼю вже показує причину (фініш раніше старту / перерва задовга / —).
+      // Просто вібруємо і чекаємо поки користувач виправить.
       vibrate(20);
-      // підсвітимо превʼю
-      const el = document.getElementById('durationPreview');
-      if (el && !el.textContent.includes('—')) {
-        // вже показано помилку
-      }
       return;
     }
     getActiveWorker().days[editingDate] = {
@@ -1569,7 +1560,163 @@ function closeModal() {
   editDraft = null;
 }
 
+// ============ WORKER EDITOR ============
+// Модал з полем імені та (для існуючого) кнопкою видалення.
+// Відкривається з settings через тап на працівника або кнопку "+ Додати працівника".
+// Закриття будь-яким способом (Cancel, ×, overlay) повертає в settings.
+//
+// Режими:
+//   editingWorkerId === null  — новий працівник, створюється тільки при натисканні "Створити"
+//   editingWorkerId === <id>  — редагування існуючого
+let editingWorkerId = null;
+let workerDraft = null; // { name }
+
+function openWorkerEditor(workerId) {
+  editingWorkerId = workerId; // null = новий
+  workerDraft = workerId
+    ? { name: state.workers[workerId].name || '' }
+    : { name: '' };
+  renderWorkerEditor();
+}
+
+function renderWorkerEditor() {
+  const isNew = !editingWorkerId;
+  // Видалення дозволене тільки для існуючого і тільки якщо лишається ще хоч один.
+  const canDelete = !isNew && Object.keys(state.workers).length > 1;
+  const title = isNew ? t('newWorkerTitle') : t('workerEditorTitle');
+  const saveLabel = isNew ? t('create') : t('save');
+
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" id="modal">
+        <div class="modal-header">
+          <div class="modal-title">${title}</div>
+          <button class="modal-close" id="closeModal" aria-label="${t('cancel')}">×</button>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="workerNameInput">${t('workerName')}</label>
+          <input type="text" id="workerNameInput"
+            value="${escapeHtml(workerDraft.name)}"
+            placeholder="${t('workerNamePlaceholder')}"
+            autocomplete="off"
+            autocapitalize="words">
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="cancelBtn">${t('cancel')}</button>
+          <button class="btn btn-primary" id="saveBtn">${saveLabel}</button>
+        </div>
+
+        ${canDelete ? `
+          <button class="btn btn-danger" id="deleteWorkerBtn">${t('deleteWorker')}</button>
+        ` : ''}
+      </div>
+    </div>
+  `;
+
+  // bindings
+  document.getElementById('modalOverlay').addEventListener('click', (e) => {
+    if (e.target.id === 'modalOverlay') exitWorkerEditor();
+  });
+  document.getElementById('closeModal').addEventListener('click', exitWorkerEditor);
+  document.getElementById('cancelBtn').addEventListener('click', exitWorkerEditor);
+  document.getElementById('saveBtn').addEventListener('click', saveWorkerEdit);
+
+  if (canDelete) {
+    attachArmedConfirm(
+      document.getElementById('deleteWorkerBtn'),
+      t('deleteWorkerConfirm2'),
+      () => {
+        delete state.workers[editingWorkerId];
+        // Якщо видалили активного — переключаємось на першого з тих що лишились
+        if (state.activeWorkerId === editingWorkerId) {
+          state.activeWorkerId = Object.keys(state.workers)[0];
+        }
+        save();
+        vibrate(20);
+        closeWorkerEditor();
+        render();
+        openSettings();
+      }
+    );
+  }
+
+  // Автофокус для нового — щоб одразу можна було вводити імʼя.
+  // Для існуючого не фокусуємо: користувач може хотіти просто видалити, не редагувати.
+  if (isNew) {
+    setTimeout(() => {
+      const inp = document.getElementById('workerNameInput');
+      if (inp) inp.focus();
+    }, 50);
+  }
+}
+
+function saveWorkerEdit() {
+  // Читаємо актуальне імʼя з input, бо ми не оновлювали draft на кожне натискання
+  const inp = document.getElementById('workerNameInput');
+  const name = inp ? inp.value.trim() : '';
+
+  if (!editingWorkerId) {
+    // Новий: створюємо і одразу робимо активним
+    const id = genWorkerId();
+    state.workers[id] = { name, days: {} };
+    state.activeWorkerId = id;
+  } else {
+    state.workers[editingWorkerId].name = name;
+  }
+  save();
+  vibrate([10, 30, 10]);
+  closeWorkerEditor();
+  render();
+  openSettings();
+}
+
+function closeWorkerEditor() {
+  document.getElementById('modalRoot').innerHTML = '';
+  editingWorkerId = null;
+  workerDraft = null;
+}
+
+// "Вийти без збереження" — після Cancel/×/overlay повертаємось у settings.
+function exitWorkerEditor() {
+  closeWorkerEditor();
+  openSettings();
+}
+
 // ============ SETTINGS / REPORT ============
+
+// Двокроковий arm-then-confirm для деструктивних дій без confirm() диалога.
+// Перший клік міняє підпис і фон на попереджувальні, другий — виконує. Через 4 сек скидається.
+// Працює і з export-btn (де є .label/.arrow), і з простими кнопками (наприклад btn-danger).
+function attachArmedConfirm(btn, confirmText, onConfirm) {
+  let armed = false, armTimer = null;
+  // Якщо всередині кнопки є .label — редагуємо саме його, інакше весь textContent.
+  const labelEl = btn.querySelector('.label') || btn;
+  const arrowEl = btn.querySelector('.arrow'); // може не бути
+  const origLabel = labelEl.textContent;
+  const origArrow = arrowEl ? arrowEl.textContent : null;
+  const disarm = () => {
+    armed = false;
+    if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+    labelEl.textContent = origLabel;
+    if (arrowEl) arrowEl.textContent = origArrow;
+    btn.style.background = '';
+  };
+  btn.addEventListener('click', () => {
+    if (!armed) {
+      armed = true;
+      labelEl.textContent = confirmText;
+      if (arrowEl) arrowEl.textContent = '×';
+      btn.style.background = 'var(--accent-tint)';
+      armTimer = setTimeout(disarm, 4000);
+      return;
+    }
+    onConfirm();
+  });
+}
+
 function openSettings() {
   const stats = computeStats();
   const root = document.getElementById('modalRoot');
@@ -1628,30 +1775,28 @@ function openSettings() {
         </div>
 
         <div class="settings-section">
-          <h3>${t('job')}</h3>
+          <h3>${t('worker')}</h3>
           <div class="job-list">
-            ${Object.entries(state.workers).map(([id, w]) => `
-              <button class="job-item ${id === state.activeWorkerId ? 'active' : ''}" data-job-id="${id}">
-                <span class="job-marker">${id === state.activeWorkerId ? '●' : '○'}</span>
-                <span class="job-name">${escapeHtml(w.name) || `<em style="color: var(--text-faint);">${t('jobUnnamed')}</em>`}</span>
-                <span class="job-count">${Object.keys(w.days).length} ${state.lang === 'en' ? 'd' : 'дн'}</span>
-              </button>
-            `).join('')}
+            ${Object.entries(state.workers).map(([id, w]) => {
+              const isActive = id === state.activeWorkerId;
+              const marker = isActive ? '●' : '○';
+              const className = `job-item${isActive ? ' active' : ''}`;
+              const nameHtml = w.name
+                ? escapeHtml(w.name)
+                : `<em style="color: var(--text-faint);">${t('workerUnnamed')}</em>`;
+              return `
+                <button class="${className}" data-worker-id="${id}">
+                  <span class="job-marker">${marker}</span>
+                  <span class="job-name">${nameHtml}</span>
+                  <span class="job-count">${Object.keys(w.days).length} ${state.lang === 'en' ? 'd' : 'дн'}</span>
+                </button>
+              `;
+            }).join('')}
           </div>
-          <button class="export-btn" id="addJob" style="margin-top: 8px;">
-            <span class="label">+ ${t('addJob')}</span>
+          <button class="export-btn" id="addWorker" style="margin-top: 8px;">
+            <span class="label">+ ${t('addWorker')}</span>
             <span class="arrow">→</span>
           </button>
-          <div style="margin-top: 14px;">
-            <label class="field-label" style="display: block; margin-bottom: 6px;">${t('jobName')}</label>
-            <input type="text" id="nameInput" value="${escapeHtml(getActiveWorker().name)}" placeholder="${t('jobNamePlaceholder')}">
-          </div>
-          ${Object.keys(state.workers).length > 1 ? `
-            <button class="export-btn" id="deleteJob" style="margin-top: 10px; color: var(--danger);">
-              <span class="label" style="color: var(--danger);">${t('deleteJob')}</span>
-              <span class="arrow" style="color: var(--danger);">×</span>
-            </button>
-          ` : ''}
         </div>
 
         <div class="settings-section">
@@ -1675,8 +1820,8 @@ function openSettings() {
           </div>
           <div class="seg" style="margin-bottom: 0;">
             ${state.style === 'paper' ? `
-              <button id="modeA" class="${state.paperMode === 'light' ? 'active' : ''}">${t('paperLight')}</button>
-              <button id="modeB" class="${state.paperMode === 'dark' ? 'active' : ''}">${t('paperDark')}</button>
+              <button id="modeA" class="${effectivePaperMode() === 'light' ? 'active' : ''}">${t('paperLight')}</button>
+              <button id="modeB" class="${effectivePaperMode() === 'dark' ? 'active' : ''}">${t('paperDark')}</button>
             ` : `
               <button id="modeA" class="${state.termMode === 'green' ? 'active' : ''}">${t('termGreen')}</button>
               <button id="modeB" class="${state.termMode === 'amber' ? 'active' : ''}">${t('termAmber')}</button>
@@ -1699,10 +1844,6 @@ function openSettings() {
             <span class="arrow" style="color: var(--danger);">×</span>
           </button>
         </div>
-
-        <div class="btn-row" style="grid-template-columns: 1fr;">
-          <button class="btn btn-primary" id="saveSettings">${t('done')}</button>
-        </div>
       </div>
     </div>
   `;
@@ -1711,47 +1852,21 @@ function openSettings() {
     if (e.target.id === 'modalOverlay') saveAndClose();
   });
   document.getElementById('closeModal').addEventListener('click', saveAndClose);
-  document.getElementById('saveSettings').addEventListener('click', saveAndClose);
   document.getElementById('exportWeek').addEventListener('click', () => {
-    saveName();
     exportPdf({ type: 'week', monday: currentMonday });
   });
   if (stats.totalHours > 0) {
     document.getElementById('exportAll').addEventListener('click', () => {
-      saveName();
       exportPdf({ type: 'all' });
     });
   }
   const clearAllBtn = document.getElementById('clearAll');
-  {
-    let armed = false;
-    let armTimer = null;
-    const labelEl = clearAllBtn.querySelector('.label');
-    const arrowEl = clearAllBtn.querySelector('.arrow');
-    const origLabel = labelEl.textContent;
-    const origArrow = arrowEl.textContent;
-    function disarm() {
-      armed = false;
-      if (armTimer) { clearTimeout(armTimer); armTimer = null; }
-      labelEl.textContent = origLabel;
-      arrowEl.textContent = origArrow;
-      clearAllBtn.style.background = '';
-    }
-    clearAllBtn.addEventListener('click', () => {
-      if (!armed) {
-        armed = true;
-        labelEl.textContent = t('deleteAllConfirm2');
-        arrowEl.textContent = '×';
-        clearAllBtn.style.background = 'var(--accent-tint)';
-        armTimer = setTimeout(disarm, 4000);
-        return;
-      }
-      getActiveWorker().days = {};
-      save();
-      closeModal();
-      render();
-    });
-  }
+  attachArmedConfirm(clearAllBtn, t('deleteAllConfirm2'), () => {
+    getActiveWorker().days = {};
+    save();
+    closeModal();
+    render();
+  });
   document.getElementById('stylePaper').addEventListener('click', () => setStyle('paper'));
   document.getElementById('styleTerminal').addEventListener('click', () => setStyle('terminal'));
   document.getElementById('modeA').addEventListener('click', () => setMode('A'));
@@ -1759,71 +1874,29 @@ function openSettings() {
   document.getElementById('langUk').addEventListener('click', () => setLang('uk'));
   document.getElementById('langEn').addEventListener('click', () => setLang('en'));
 
-  // ----- ЖОБИ: вибір активної, додавання, видалення -----
-  document.querySelectorAll('.job-item').forEach(btn => {
+  // ----- ПРАЦІВНИКИ: тап на будь-якого активує його (якщо ще ні) і відкриває картку.
+  // "+ Додати" — теж відкриває картку, з порожнім імʼям. -----
+  document.querySelectorAll('button.job-item').forEach(btn => {
     btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-job-id');
-      if (id && id !== state.activeWorkerId && state.workers[id]) {
-        // Перед перемиканням збережемо поточне імʼя в полі (на випадок якщо редагували)
-        saveName();
+      const id = btn.getAttribute('data-worker-id');
+      if (!id || !state.workers[id]) return;
+      // Активуємо одразу, навіть до відкриття картки. Тап = вибір.
+      if (id !== state.activeWorkerId) {
         state.activeWorkerId = id;
         save();
-        // Перерендеримо модалку щоб список оновився
-        closeModal();
         render();
-        openSettings();
       }
-    });
-  });
-  document.getElementById('addJob').addEventListener('click', () => {
-    saveName();
-    const id = genWorkerId();
-    state.workers[id] = { name: '', days: {} };
-    state.activeWorkerId = id;
-    save();
-    closeModal();
-    render();
-    openSettings();
-  });
-  const delJobBtn = document.getElementById('deleteJob');
-  if (delJobBtn) {
-    let armed = false;
-    let armTimer = null;
-    const labelEl = delJobBtn.querySelector('.label');
-    const arrowEl = delJobBtn.querySelector('.arrow');
-    const origLabel = labelEl.textContent;
-    const origArrow = arrowEl.textContent;
-    function disarm() {
-      armed = false;
-      if (armTimer) { clearTimeout(armTimer); armTimer = null; }
-      labelEl.textContent = origLabel;
-      arrowEl.textContent = origArrow;
-      delJobBtn.style.background = '';
-    }
-    delJobBtn.addEventListener('click', () => {
-      if (Object.keys(state.workers).length <= 1) return;
-      if (!armed) {
-        // Перший клік — попередження
-        armed = true;
-        labelEl.textContent = t('deleteJobConfirm2');
-        arrowEl.textContent = '×';
-        delJobBtn.style.background = 'var(--accent-tint)';
-        armTimer = setTimeout(disarm, 4000); // авто-скидання через 4 сек
-        return;
-      }
-      // Другий клік — справжнє видалення
-      delete state.workers[state.activeWorkerId];
-      state.activeWorkerId = Object.keys(state.workers)[0];
-      save();
       closeModal();
-      render();
-      openSettings();
+      openWorkerEditor(id);
     });
-  }
+  });
+  document.getElementById('addWorker').addEventListener('click', () => {
+    closeModal();
+    openWorkerEditor(null);
+  });
 
   // ----- РЕЗЕРВНА КОПІЯ: експорт у файл, імпорт з файлу -----
   document.getElementById('exportData').addEventListener('click', () => {
-    saveName();
     exportBackup();
   });
   document.getElementById('importData').addEventListener('click', () => {
@@ -1840,7 +1913,6 @@ function openSettings() {
     save();
     applyStyle();
     // Перерендеримо модалку, бо суб-перемикач (варіація) міняється
-    saveName();
     closeModal();
     render();
     openSettings();
@@ -1864,19 +1936,12 @@ function openSettings() {
     save();
     applyLang(lang);
     // Перерендеримо модалку, бо всі підписи залежать від мови
-    saveName();
     closeModal();
     render();
     openSettings();
   }
 
-  function saveName() {
-    getActiveWorker().name = document.getElementById('nameInput').value.trim();
-    save();
-  }
-
   function saveAndClose() {
-    saveName();
     closeModal();
   }
 }
@@ -2082,11 +2147,15 @@ function buildReportHtml(scope) {
     ${grandTotalHtml}
   `;
 
+  // Імена файлів — латинкою для надійності, але слова за поточною мовою
+  const fileWeek = state.lang === 'en' ? 'hours_week' : 'hodyny_tyzhden';
+  const fileReport = state.lang === 'en' ? 'hours_report' : 'hodyny_zvit';
+
   return {
     hasContent: hasAnyContent,
     filename: scope.type === 'week'
-      ? `hodyny_tyzhden_${isoDate(firstMonday)}.pdf`
-      : `hodyny_zvit_${isoDate(periodStart)}_${isoDate(periodEnd)}.pdf`
+      ? `${fileWeek}_${isoDate(firstMonday)}.pdf`
+      : `${fileReport}_${isoDate(periodStart)}_${isoDate(periodEnd)}.pdf`
   };
 }
 
@@ -2234,7 +2303,7 @@ document.getElementById('settingsBtn').addEventListener('click', openSettings);
 
 // ============ BACKUP (експорт/імпорт даних) ============
 // Зберігає весь state у JSON-файл і дає його завантажити.
-// Файл містить усі роботи, дні і налаштування — повна копія.
+// Файл містить усіх працівників, дні і налаштування — повна копія.
 function exportBackup() {
   try {
     const payload = {
@@ -2306,12 +2375,22 @@ function importBackup(file) {
 
 // ============ STYLE / MODE ============
 // Застосовує стиль і його варіацію: ставить data-style + data-mode на <html>,
+// Резолвить ефективну варіацію паперової теми.
+// Якщо state.paperMode = null (auto) — читає системну тему через prefers-color-scheme.
+// Якщо явно задано 'light' або 'dark' — повертає його.
+function effectivePaperMode() {
+  if (state.paperMode === 'light' || state.paperMode === 'dark') return state.paperMode;
+  // Auto: слідуємо системі. matchMedia є у всіх Android Chrome від 2014+.
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+  return 'light';
+}
+
 // оновлює meta theme-color (колір системної смужки в Android Chrome PWA).
 function applyStyle() {
   const html = document.documentElement;
   html.setAttribute('data-style', state.style);
   if (state.style === 'paper') {
-    html.setAttribute('data-mode', state.paperMode);
+    html.setAttribute('data-mode', effectivePaperMode());
   } else {
     html.setAttribute('data-mode', state.termMode);
   }
@@ -2325,20 +2404,32 @@ function applyStyle() {
       'terminal-amber': '#0e0a05'
     };
     const key = state.style === 'paper'
-      ? `paper-${state.paperMode}`
+      ? `paper-${effectivePaperMode()}`
       : `terminal-${state.termMode}`;
     meta.setAttribute('content', colors[key] || '#ede0c4');
   }
 }
 
 // ============ LANGUAGE ============
-// Застосовує мову: міняє <html lang>, <title>, footer-label
+// Застосовує мову: міняє <html lang>, <title>, footer-label, aria-label на іконкових кнопках
 // (важливо для скрін-рідерів і коректного перенесення слів)
 function applyLang(lang) {
   document.documentElement.setAttribute('lang', lang);
   document.title = t('appTitle');
   const footerLabel = document.getElementById('footerLabel');
   if (footerLabel) footerLabel.textContent = t('weekTotalLabel');
+  // aria-label для іконкових кнопок (символи ‹ › ⚙ скрін-рідером самі по собі неінформативні)
+  const ariaMap = {
+    prevWeek: 'prevWeek',
+    nextWeek: 'nextWeek',
+    settingsBtn: 'settings',
+    weekTitle: 'selectDate',
+    datePicker: 'selectDate'
+  };
+  for (const [id, key] of Object.entries(ariaMap)) {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute('aria-label', t(key));
+  }
 }
 
 // ============ SERVICE WORKER ============
@@ -2353,6 +2444,18 @@ load();
 applyStyle();
 applyLang(state.lang);
 render();
+
+// Слухач системної теми (prefers-color-scheme).
+// Коли paperMode у режимі auto (null) і користувач у паперовому стилі —
+// миттєво перемикаємо тему слідом за системою. Якщо явно вибрано
+// 'light' або 'dark', або якщо стиль термінал — нічого не робимо.
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (state.paperMode === null && state.style === 'paper') {
+      applyStyle();
+    }
+  });
+}
 </script>
 </body>
 </html>

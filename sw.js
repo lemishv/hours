@@ -1,11 +1,13 @@
-const CACHE = 'hours-v7';
+const CACHE = 'hours-v12';
 const ASSETS = [
   './',
   'index.html',
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
-  'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&display=swap'
+  // ВАЖЛИВО: ваги мають точно збігатись з URL у index.html, інакше SW кешує
+  // адресу, яку браузер ніколи не запитує, а реальна підвантажується тільки online.
+  'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap'
 ];
 
 self.addEventListener('install', e => {
@@ -47,7 +49,7 @@ self.addEventListener('fetch', e => {
           }
           return res;
         })
-        .catch(() => caches.match(e.request).then(c => c || caches.match('index.html')))
+        .catch(() => caches.match(e.request).then(c => c || caches.match('./index.html')))
     );
   } else {
     e.respondWith(
