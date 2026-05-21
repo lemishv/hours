@@ -1,34 +1,45 @@
-const CACHE = 'hours-v12';
-const ASSETS = [
+const CACHE = 'hours-v13';
+
+// Критичний shell — без цього офлайн взагалі не відкривається.
+// Якщо тут падіння — SW свідомо не активується. Це краще за тихий
+// порожній кеш, який вдає що все добре.
+const CRITICAL = [
   './',
   'index.html',
-  'manifest.json',
+  'manifest.json'
+];
+
+// Опціональні ресурси. Кожен кешуємо окремо через allSettled —
+// помилка одного не валить решту. Якщо CDN недоступний у момент
+// встановлення, офлайн працює без PDF-експорту або без кастомних
+// шрифтів, але працює.
+const OPTIONAL = [
   'icon-192.png',
   'icon-512.png',
-  // ВАЖЛИВО: ваги мають точно збігатись з URL у index.html, інакше SW кешує
-  // адресу, яку браузер ніколи не запитує, а реальна підвантажується тільки online.
-  'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap'
+  'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(ASSETS))
-      .then(() => self.skipWaiting())
-      .catch(() => {})
-  );
+  e.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    // Критичне — мусить пройти.
+    await cache.addAll(CRITICAL);
+    // Опціональне — best-effort.
+    await Promise.allSettled(OPTIONAL.map(url => cache.add(url)));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 
-// HTML і manifest — network-first (нова версія підхоплюється одразу при оновленні)
-// Решта (іконки, шрифти) — cache-first (швидко і офлайн)
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
 
@@ -40,20 +51,34 @@ self.addEventListener('fetch', e => {
     path.endsWith('/manifest.json');
 
   if (isShell) {
-    e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(e.request).then(c => c || caches.match('./index.html')))
-    );
+    // Network-first для shell: нова версія підхоплюється одразу.
+    // Офлайн → з кешу; якщо точного матчу нема — повертаємо index.html
+    // як універсальний fallback.
+    e.respondWith((async () => {
+      try {
+        const res = await fetch(e.request);
+        if (res && res.status === 200 && res.type === 'basic') {
+          const cache = await caches.open(CACHE);
+          cache.put(e.request, res.clone());
+        }
+        return res;
+      } catch {
+        const cached = await caches.match(e.request);
+        return cached
+          || await caches.match('index.html')
+          || await caches.match('./');
+      }
+    })());
   } else {
-    e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => cached))
-    );
+    // Cache-first для всього іншого (іконки, шрифти, CDN-скрипти).
+    e.respondWith((async () => {
+      const cached = await caches.match(e.request);
+      if (cached) return cached;
+      try {
+        return await fetch(e.request);
+      } catch {
+        return Response.error();
+      }
+    })());
   }
 });
